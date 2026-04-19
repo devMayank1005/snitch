@@ -1,5 +1,5 @@
-import { useState } from 'react'
-
+import { RouterProvider } from 'react-router'
+import {routes} from './app.route'
 import './App.css'
 
 function App() {
@@ -7,7 +7,7 @@ function App() {
 
   return (
     <>
-    hello world
+   <RouterProvider router={routes} /> 
     </>
   )
 }
