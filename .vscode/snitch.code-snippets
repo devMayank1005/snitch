@@ -1,0 +1,15 @@
+{
+  "Custom Block Comment": {
+    "scope": "javascript,typescript",
+    "prefix": "comm",
+    "body": [
+      "/**",
+      " * $1",
+      " * $2",
+      " * $3",
+      " * $4",
+      " */"
+    ],
+    "description": "Generate a multiline comment block"
+  }
+}
