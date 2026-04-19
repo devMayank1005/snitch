@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../hook/useAuth.js";
 import { useNavigate, Link } from "react-router";
+import GoogleOAuthButton from "../components/GoogleOAuthButton.jsx";
 
 /* ─── tiny SVG icons ─── */
 const IconMail = () => (
@@ -154,18 +155,13 @@ export default function Login() {
     if (result && result.success) {
       setSubmitted(true);
       setTimeout(() => {
-        navigate("/");
+        navigate("/dashboard");
       }, 1500); // Redirect after short delay to show success animation
     }
   };
 
   return (
     <>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
-
       <div className="min-h-screen grid lg:grid-cols-2 font-[Inter,sans-serif] bg-white dark:bg-zinc-950 transition-colors duration-300">
         
         {/* ── Visual Left Side (Image) ── */}
@@ -362,6 +358,17 @@ export default function Login() {
                       "Log In"
                     )}
                   </button>
+
+                  <div className="relative my-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      <span className="bg-white dark:bg-zinc-900 px-3">Or</span>
+                    </div>
+                  </div>
+
+                  <GoogleOAuthButton />
                 </form>
               )}
 

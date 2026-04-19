@@ -52,13 +52,9 @@ authApiInstance.interceptors.response.use(
         const state = store.getState();
         const refreshToken = state.auth.refreshToken;
 
-        if (!refreshToken) {
-          throw new Error("No refresh token available");
-        }
-
         const response = await axios.post(
           "/api/auth/refresh",
-          { refreshToken },
+          refreshToken ? { refreshToken } : {},
           { withCredentials: true }
         );
 
@@ -149,7 +145,10 @@ export async function verifyEmail(token) {
  */
 export async function refreshAccessToken(refreshToken) {
   try {
-    const response = await authApiInstance.post("/refresh", { refreshToken });
+    const response = await authApiInstance.post(
+      "/refresh",
+      refreshToken ? { refreshToken } : {}
+    );
     return response.data;
   } catch (error) {
     throw error;
@@ -161,11 +160,30 @@ export async function refreshAccessToken(refreshToken) {
  */
 export async function logoutUser(refreshToken) {
   try {
-    const response = await authApiInstance.post("/logout", { refreshToken });
+    const response = await authApiInstance.post(
+      "/logout",
+      refreshToken ? { refreshToken } : {}
+    );
     return response.data;
   } catch (error) {
     throw error;
   }
+}
+
+/**
+ * Start Google OAuth flow
+ */
+export function startGoogleAuth() {
+  const oauthPath = "/api/auth/google";
+  const apiBaseUrl = import.meta.env.VITE_API_URL;
+
+  if (apiBaseUrl) {
+    window.location.href = `${apiBaseUrl}${oauthPath}`;
+    return;
+  }
+
+  // In local dev, Vite proxy forwards /api/* to backend.
+  window.location.href = oauthPath;
 }
 
 /**

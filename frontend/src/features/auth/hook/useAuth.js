@@ -171,13 +171,11 @@ export const useAuth = () => {
       dispatch(setLoading(true));
       
       // Call logout endpoint (non-blocking)
-      if (auth.refreshToken) {
-        try {
-          await logoutUser(auth.refreshToken);
-        } catch (error) {
-          console.error("Logout request failed:", error);
-          // Continue with logout even if API call fails
-        }
+      try {
+        await logoutUser(auth.refreshToken);
+      } catch (error) {
+        console.error("Logout request failed:", error);
+        // Continue with logout even if API call fails
       }
 
       // Clear local state

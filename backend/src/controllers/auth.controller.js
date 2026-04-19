@@ -13,6 +13,40 @@ import {
   sendPasswordResetEmail,
 } from "../config/emailConfig.js";
 
+const getFrontendUrl = () => process.env.FRONTEND_URL || "http://localhost:5174";
+
+const issueAuthCookies = async (user, res) => {
+  const accessToken = generateAccessToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  const accessTokenDecoded = decodeToken(accessToken);
+  const refreshTokenDecoded = decodeToken(refreshToken);
+  const refreshTokenExpiry = new Date(refreshTokenDecoded.exp * 1000);
+
+  await user.addRefreshToken(refreshToken, refreshTokenExpiry);
+  await user.save();
+
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 1000,
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    accessTokenExpiry: accessTokenDecoded?.exp ? new Date(accessTokenDecoded.exp * 1000) : null,
+  };
+};
+
 /**
  * Send tokens in response
  * @param {object} user - User document
@@ -21,34 +55,7 @@ import {
  * @param {string} message - Response message
  */
 export const sendTokenResponse = async (user, statusCode, res, message) => {
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  // Calculate token expiry dates
-  const accessTokenDecoded = decodeToken(accessToken);
-  const refreshTokenDecoded = decodeToken(refreshToken);
-  const accessTokenExpiry = new Date(accessTokenDecoded.exp * 1000);
-  const refreshTokenExpiry = new Date(refreshTokenDecoded.exp * 1000);
-
-  // Store refresh token in database
-  await user.addRefreshToken(refreshToken, refreshTokenExpiry);
-  await user.save();
-
-  // Set accessible cookie with access token (1 hour)
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 60 * 60 * 1000, // 1 hour
-  });
-
-  // Set secure refresh token cookie (7 days)
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+  const { accessToken, refreshToken } = await issueAuthCookies(user, res);
 
   return res.status(statusCode).json({
     success: true,
@@ -440,5 +447,21 @@ export const getCurrentUser = async (req, res) => {
       success: false,
       message: "Failed to get user",
     });
+  }
+};
+
+export const googleCallback = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.redirect(`${getFrontendUrl()}/login?error=google_auth_failed`);
+    }
+
+    await issueAuthCookies(user, res);
+    return res.redirect(`${getFrontendUrl()}/dashboard`);
+  } catch (error) {
+    console.error("Google callback error:", error);
+    return res.redirect(`${getFrontendUrl()}/login?error=google_auth_failed`);
   }
 };
