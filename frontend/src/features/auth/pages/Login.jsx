@@ -1,21 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../hook/useAuth.js";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 
 /* ─── tiny SVG icons ─── */
-const IconUser = () => (
-  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
 const IconMail = () => (
   <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-  </svg>
-);
-const IconPhone = () => (
-  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
   </svg>
 );
 const IconLock = () => (
@@ -35,35 +25,21 @@ const IconEyeOff = () => (
   </svg>
 );
 const IconError = () => (
-  <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+  <svg className="
+  w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
   </svg>
 );
 
 /* ─── validators ─── */
 const validate = {
-  fullName: (v) => {
-    if (!v.trim()) return "Full name is required.";
-    if (v.trim().length < 2) return "Name must be at least 2 characters.";
-    return "";
-  },
   email: (v) => {
     if (!v.trim()) return "Email address is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Enter a valid email address.";
     return "";
   },
-  contact: (v) => {
-    if (!v.trim()) return "Contact number is required.";
-    if (!/^[0-9]{10}$/.test(v.trim())) return "Enter a valid 10-digit phone number.";
-    return "";
-  },
   password: (v) => {
     if (!v) return "Password is required.";
-    if (v.length < 8) return "Password must be at least 8 characters.";
-    if (!/[A-Z]/.test(v)) return "Include at least one uppercase letter.";
-    if (!/[a-z]/.test(v)) return "Include at least one lowercase letter.";
-    if (!/[0-9]/.test(v)) return "Include at least one number.";
-    if (!/[@$!%*?&]/.test(v)) return "Include at least one special character (@$!%*?&).";
     return "";
   },
 };
@@ -129,17 +105,16 @@ function InputField({ id, label, type = "text", name, value, onChange, onBlur, p
   );
 }
 
-/* ─── Main Register Page ─── */
-export default function Register() {
+/* ─── Main Login Page ─── */
+export default function Login() {
   const navigate = useNavigate();
-  const { handleRegister, auth } = useAuth();
+  const { handleLogin, auth } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
-  const [isSeller, setIsSeller] = useState(false);
 
-  const [form, setForm] = useState({ fullName: "", email: "", contact: "", password: "" });
-  const [errors, setErrors] = useState({ fullName: "", email: "", contact: "", password: "" });
-  const [touched, setTouched] = useState({ fullName: false, email: false, contact: false, password: false });
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({ email: "", password: "" });
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
 
   const handleChange = (e) => {
@@ -159,23 +134,19 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Touch all fields
-    const allTouched = { fullName: true, email: true, contact: true, password: true };
+    const allTouched = { email: true, password: true };
     const allErrors = {
-      fullName: validate.fullName(form.fullName),
       email: validate.email(form.email),
-      contact: validate.contact(form.contact),
       password: validate.password(form.password),
     };
     setTouched(allTouched);
     setErrors(allErrors);
+    
     if (Object.values(allErrors).some(Boolean)) return;
     
-    const result = await handleRegister({
+    const result = await handleLogin({
       email: form.email,
-      contact: form.contact,
       password: form.password,
-      fullName: form.fullName,
-      isSeller
     });
 
     if (result && result.success) {
@@ -250,10 +221,10 @@ export default function Register() {
                 </div>
                 
                 <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">
-                  Welcome to Snitch
+                  Welcome Back
                 </h1>
                 <p className="text-base text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
-                  Elevate your fashion. Create an account to start shopping or selling.
+                  Log in to access your curated wardrobe.
                 </p>
               </div>
 
@@ -264,8 +235,8 @@ export default function Register() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Account Created!</h2>
-                  <p className="text-zinc-500 dark:text-zinc-400">Welcome to the future of fashion, {form.fullName.split(" ")[0]} 🎉</p>
+                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Logged In!</h2>
+                  <p className="text-zinc-500 dark:text-zinc-400">Welcome back to Snitch 🎉</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
@@ -275,19 +246,6 @@ export default function Register() {
                       <span>{auth.error}</span>
                     </div>
                   )}
-
-                  <InputField
-                    id="fullName"
-                    label="Full Name"
-                    name="fullName"
-                    value={form.fullName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="John Doe"
-                    icon={<IconUser />}
-                    error={errors.fullName}
-                    touched={touched.fullName}
-                  />
 
                   <InputField
                     id="email"
@@ -303,34 +261,47 @@ export default function Register() {
                     touched={touched.email}
                   />
 
-                  <InputField
-                    id="contact"
-                    label="Contact Number"
-                    name="contact"
-                    type="tel"
-                    value={form.contact}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="9876543210"
-                    icon={<IconPhone />}
-                    error={errors.contact}
-                    touched={touched.contact}
-                  />
-
                   <div>
-                    <InputField
-                      id="password"
-                      label="Password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      value={form.password}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      placeholder="Min. 8 characters"
-                      icon={<IconLock />}
-                      error={errors.password}
-                      touched={touched.password}
-                      rightEl={
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="password" className="text-sm font-medium text-zinc-900 dark:text-zinc-200">
+                        Password
+                      </label>
+                      <a href="#" className="text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-4">
+                        Forgot password?
+                      </a>
+                    </div>
+                    <div className="relative flex items-center group focus-within:z-10">
+                      <span
+                        className={`absolute left-3.5 transition-colors duration-200 ${
+                          (touched.password && errors.password) ? "text-red-500" : "text-zinc-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
+                        }`}
+                      >
+                        <IconLock />
+                      </span>
+
+                      <input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        required
+                        value={form.password}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        placeholder="Enter your password"
+                        className={`
+                          w-full pl-10 pr-11 py-3.5 rounded-xl text-[15px]
+                          bg-zinc-50 dark:bg-zinc-800/50
+                          border-2 transition-all duration-200 outline-none
+                          text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500
+                          ${(touched.password && errors.password)
+                              ? "border-red-500 focus:border-red-600 focus:ring-4 focus:ring-red-500/20" 
+                              : "border-transparent focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-600/10 dark:focus:ring-indigo-500/20"
+                          }
+                        `}
+                      />
+
+                      <div className="absolute right-3.5">
                         <button
                           type="button"
                           onClick={() => setShowPassword((p) => !p)}
@@ -339,61 +310,16 @@ export default function Register() {
                         >
                           {showPassword ? <IconEyeOff /> : <IconEye />}
                         </button>
-                      }
-                    />
-                    
-                    {/* Password criteria hints */}
-                    {form.password && (
-                      <ul className="mt-2 space-y-1 ml-1">
-                        {[
-                          { ok: form.password.length >= 8, label: "At least 8 characters" },
-                          { ok: /[A-Z]/.test(form.password), label: "One uppercase letter" },
-                          { ok: /[a-z]/.test(form.password), label: "One lowercase letter" },
-                          { ok: /[0-9]/.test(form.password), label: "One number" },
-                          { ok: /[@$!%*?&]/.test(form.password), label: "One special character (@$!%*?&)" },
-                        ].map(({ ok, label }) => (
-                          <li key={label} className="flex items-center gap-2 text-xs font-medium">
-                            <span className={ok ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-300 dark:text-zinc-600"}>
-                              {ok ? "✓" : "○"}
-                            </span>
-                            <span className={ok ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-500 dark:text-zinc-400"}>
-                              {label}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* Register as Seller Toggle */}
-                  <div className="flex items-start gap-4 mt-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 transition-colors">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <input
-                        id="isSeller"
-                        type="checkbox"
-                        checked={isSeller}
-                        onChange={(e) => setIsSeller(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <label
-                        htmlFor="isSeller"
-                        className={`flex items-center justify-center w-6 h-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                          isSeller 
-                            ? "border-indigo-600 bg-indigo-600 text-white" 
-                            : "border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-transparent"
-                        }`}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </label>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[15px] font-bold text-zinc-900 dark:text-white cursor-pointer select-none" onClick={() => setIsSeller(!isSeller)}>
-                        Register as Seller
-                      </span>
-                      <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">
-                        List and manage your own products on Snitch.
+
+                    <div
+                      className="overflow-hidden transition-all duration-300 ease-in-out"
+                      style={{ maxHeight: (touched.password && errors.password) ? "40px" : "0px", opacity: (touched.password && errors.password) ? 1 : 0 }}
+                    >
+                      <p className="flex items-start gap-1 text-[13px] font-medium text-red-500 mt-1.5">
+                        <IconError />
+                        {errors.password}
                       </p>
                     </div>
                   </div>
@@ -409,7 +335,7 @@ export default function Register() {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                       </svg>
                     ) : (
-                      "Create Account"
+                      "Log In"
                     )}
                   </button>
                 </form>
@@ -419,17 +345,17 @@ export default function Register() {
               {!submitted && (
                 <div className="mt-8 text-center space-y-4">
                   <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                    Already have an account?{" "}
-                    <a href="/login" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline underline-offset-4">
-                      Log in completely
-                    </a>
+                    Don't have an account?{" "}
+                    <Link to="/register" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline underline-offset-4">
+                      Create one
+                    </Link>
                   </p>
                 </div>
               )}
             </div>
             
             <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-8 relative z-10">
-              By registering, you agree to our <a href="#" className="underline hover:text-zinc-900 dark:hover:text-zinc-300">Terms of Service</a> & <a href="#" className="underline hover:text-zinc-900 dark:hover:text-zinc-300">Privacy Policy</a>
+              By logging in, you agree to our <a href="#" className="underline hover:text-zinc-900 dark:hover:text-zinc-300">Terms of Service</a> & <a href="#" className="underline hover:text-zinc-900 dark:hover:text-zinc-300">Privacy Policy</a>
             </p>
 
           </div>

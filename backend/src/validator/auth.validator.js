@@ -7,10 +7,29 @@ function validateRequest(req,res,next){
     next();
 }
 export const validateRegister = [
-    body("email").isEmail().withMessage("Invalid email"),
-    body("password").isLength({ min: 6 }).matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/).withMessage("Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"),
-    body("fullName").notEmpty().withMessage("Full name is required"),
-    body("contact").notEmpty().withMessage("Contact is required").matches(/^[0-9]{10}$/).withMessage("Invalid contact number"),
-    body("isSeller").optional().isBoolean().withMessage("Invalid seller status"),
-   validateRequest
-]
+  body("email")
+    .isEmail()
+    .withMessage("Invalid email"),
+
+  body("password")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/)
+    .withMessage("Password must include uppercase, lowercase, number, special char"),
+
+  body("fullName")
+    .notEmpty()
+    .withMessage("Full name is required"),
+
+  body("contact")
+    .matches(/^[0-9]{10}$/)
+    .withMessage("Invalid contact number"),
+
+  body("isSeller")
+    .optional()
+    .toBoolean()
+    .isBoolean(),
+
+  validateRequest
+];
+
