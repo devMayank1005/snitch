@@ -180,9 +180,7 @@ export default function Register() {
 
     if (result && result.success) {
       setSubmitted(true);
-      setTimeout(() => {
-        navigate("/");
-      }, 1500); // Redirect after short delay to show success animation
+      // No auto-redirect: user needs to verify email first
     }
   };
 
@@ -265,7 +263,18 @@ export default function Register() {
                     </svg>
                   </div>
                   <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Account Created!</h2>
-                  <p className="text-zinc-500 dark:text-zinc-400">Welcome to the future of fashion, {form.fullName.split(" ")[0]} 🎉</p>
+                  <p className="text-zinc-500 dark:text-zinc-400 mb-6">Welcome, {form.fullName.split(" ")[0]} 🎉</p>
+                  <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 mb-6">
+                    <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                      Please check your email at <strong>{form.email}</strong> to verify your account. The link expires in 24 hours.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => window.open(`https://mail.google.com` , '_blank')}
+                    className="inline-block px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors"
+                  >
+                    Open Gmail
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">

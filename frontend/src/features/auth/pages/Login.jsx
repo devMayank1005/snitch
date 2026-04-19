@@ -111,6 +111,7 @@ export default function Login() {
   const { handleLogin, auth } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({ email: "", password: "" });
@@ -147,6 +148,7 @@ export default function Login() {
     const result = await handleLogin({
       email: form.email,
       password: form.password,
+      rememberMe,
     });
 
     if (result && result.success) {
@@ -266,9 +268,9 @@ export default function Login() {
                       <label htmlFor="password" className="text-sm font-medium text-zinc-900 dark:text-zinc-200">
                         Password
                       </label>
-                      <a href="#" className="text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-4">
+                      <Link to="/forgot-password" className="text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-4">
                         Forgot password?
-                      </a>
+                      </Link>
                     </div>
                     <div className="relative flex items-center group focus-within:z-10">
                       <span
@@ -322,6 +324,28 @@ export default function Login() {
                         {errors.password}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Remember me checkbox */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="rememberMe"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <label
+                      htmlFor="rememberMe"
+                      className="flex items-center justify-center w-5 h-5 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 cursor-pointer transition-all duration-200 peer-checked:border-indigo-600 peer-checked:bg-indigo-600"
+                    >
+                      <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </label>
+                    <label htmlFor="rememberMe" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                      Remember me for 30 days
+                    </label>
                   </div>
 
                   <button
