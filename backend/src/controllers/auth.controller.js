@@ -174,6 +174,57 @@ export const verifyEmail = async (req, res) => {
 };
 
 /**
+ * Resend email verification link
+ */
+export const resendVerificationEmail = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await UserModel.findOne({ email });
+
+    // Do not reveal if email exists
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "If this email exists and is unverified, a new verification email has been sent.",
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({
+        success: true,
+        message: "Email is already verified. You can login now.",
+      });
+    }
+
+    const verificationToken = user.generateEmailVerificationToken();
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, verificationToken);
+    } catch (emailError) {
+      console.error("Resend verification email failed:", emailError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please try again.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification email resent successfully.",
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resend verification email.",
+    });
+  }
+};
+
+/**
  * Login user
  */
 export const loginUser = async (req, res) => {

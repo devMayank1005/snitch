@@ -50,6 +50,7 @@ export const requireAuth = async (req, res, next) => {
     req.user = {
       userId: decoded.userId,
       id: decoded.userId, // Alias for compatibility
+      
     };
 
     next();

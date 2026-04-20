@@ -133,7 +133,7 @@ function InputField({ id, label, type = "text", name, value, onChange, onBlur, p
 /* ─── Main Register Page ─── */
 export default function Register() {
   const navigate = useNavigate();
-  const { handleRegister, auth } = useAuth();
+  const { handleRegister, handleResendVerificationEmail, auth } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
   const [isSeller, setIsSeller] = useState(false);
@@ -142,6 +142,7 @@ export default function Register() {
   const [errors, setErrors] = useState({ fullName: "", email: "", contact: "", password: "" });
   const [touched, setTouched] = useState({ fullName: false, email: false, contact: false, password: false });
   const [submitted, setSubmitted] = useState(false);
+  const [resendStatus, setResendStatus] = useState({ message: "", isError: false });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -181,8 +182,21 @@ export default function Register() {
 
     if (result && result.success) {
       setSubmitted(true);
+      setResendStatus({ message: "", isError: false });
       // No auto-redirect: user needs to verify email first
     }
+  };
+
+  const handleResendEmail = async () => {
+    setResendStatus({ message: "", isError: false });
+    const result = await handleResendVerificationEmail(form.email);
+
+    if (result.success) {
+      setResendStatus({ message: result.message, isError: false });
+      return;
+    }
+
+    setResendStatus({ message: result.error, isError: true });
   };
 
   return (
@@ -271,6 +285,24 @@ export default function Register() {
                   >
                     Open Gmail
                   </button>
+                  <button
+                    onClick={handleResendEmail}
+                    disabled={auth?.loading}
+                    className="ml-3 inline-block px-6 py-2 rounded-lg border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-400 font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {auth?.loading ? "Sending..." : "Resend Verification Email"}
+                  </button>
+                  {resendStatus.message && (
+                    <p
+                      className={`mt-4 text-sm font-medium ${
+                        resendStatus.isError
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {resendStatus.message}
+                    </p>
+                  )}
                   <div className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
                     After verification, you can also use Google sign-in from the login page.
                   </div>

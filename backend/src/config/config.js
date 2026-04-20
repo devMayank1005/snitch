@@ -1,7 +1,25 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-// Validate required environment variables
+const getRequiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`${name} is not defined in environment variables`);
+  }
+  return value;
+};
+
+const parseRequiredPort = (name) => {
+  const value = getRequiredEnv(name);
+  const parsed = Number.parseInt(value, 10);
+
+  if (Number.isNaN(parsed)) {
+    throw new Error(`${name} must be a valid number`);
+  }
+
+  return parsed;
+};
+
 const requiredEnvVars = [
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
@@ -13,31 +31,37 @@ const requiredEnvVars = [
   "BREVO_SMTP_USER",
   "BREVO_SMTP_PASSWORD",
   "SMTP_FROM_EMAIL",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_CALLBACK_URL",
+  "FRONTEND_URL",
+  "IMAGE_KIT_PRIVATE_KEY",
+  "IMAGE_KIT_PUBLIC_KEY",
+  "IMAGE_KIT_URL_ENDPOINT",
 ];
 
-requiredEnvVars.forEach((envVar) => {
-  if (!process.env[envVar]) {
-    throw new Error(`${envVar} is not defined in environment variables`);
-  }
-});
+requiredEnvVars.forEach(getRequiredEnv);
 
 export const config = {
-  port: process.env.PORT || 5000,
-  mongodbUri: process.env.MONGODB_URI,
-  nodeEnv: process.env.NODE_ENV || "development",
-  
-  // JWT Secrets for dual-token strategy
-  jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
-  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-  jwtAccessExpiry: "15m",    // Access token expires in 15 minutes
-  jwtRefreshExpiry: "7d",    // Refresh token expires in 7 days
-  
+  port: parseRequiredPort("PORT"),
+  mongodbUri: getRequiredEnv("MONGODB_URI"),
+  nodeEnv: getRequiredEnv("NODE_ENV"),
+
+  JWT_ACCESS_SECRET: getRequiredEnv("JWT_ACCESS_SECRET"),
+  JWT_REFRESH_SECRET: getRequiredEnv("JWT_REFRESH_SECRET"),
+  jwtAccessExpiry: "15m",
+  jwtRefreshExpiry: "7d",
+
+  IMAGE_KIT_PRIVATE_KEY: getRequiredEnv("IMAGE_KIT_PRIVATE_KEY"),
+  IMAGE_KIT_PUBLIC_KEY: getRequiredEnv("IMAGE_KIT_PUBLIC_KEY"),
+  IMAGE_KIT_URL_ENDPOINT: getRequiredEnv("IMAGE_KIT_URL_ENDPOINT"),
+
   // Email Configuration
   smtp: {
-    host: process.env.BREVO_SMTP_HOST,
-    port: parseInt(process.env.BREVO_SMTP_PORT),
-    user: process.env.BREVO_SMTP_USER,
-    password: process.env.BREVO_SMTP_PASSWORD,
-    fromEmail: process.env.SMTP_FROM_EMAIL,
+    host: getRequiredEnv("BREVO_SMTP_HOST"),
+    port: parseRequiredPort("BREVO_SMTP_PORT"),
+    user: getRequiredEnv("BREVO_SMTP_USER"),
+    password: getRequiredEnv("BREVO_SMTP_PASSWORD"),
+    fromEmail: getRequiredEnv("SMTP_FROM_EMAIL"),
   },
 };

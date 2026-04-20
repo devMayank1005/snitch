@@ -14,6 +14,7 @@ import {
   register,
   login,
   verifyEmail,
+  resendVerificationEmail,
   logoutUser,
   requestPasswordReset,
   resetPassword,
@@ -124,6 +125,26 @@ export const useAuth = () => {
   }
 
   /**
+   * Resend verification email
+   */
+  async function handleResendVerificationEmail(email) {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      const response = await resendVerificationEmail(email);
+
+      return { success: true, message: response.message };
+    } catch (error) {
+      const errorMessage = extractErrorMessage(error);
+      dispatch(setError(errorMessage));
+      return { success: false, error: errorMessage };
+    } finally {
+      dispatch(setLoading(false));
+    }
+  }
+
+  /**
    * Request password reset email
    */
   async function handleRequestPasswordReset(email) {
@@ -194,6 +215,7 @@ export const useAuth = () => {
     handleRegister,
     handleLogin,
     handleVerifyEmail,
+    handleResendVerificationEmail,
     handleRequestPasswordReset,
     handleResetPassword,
     handleLogout,

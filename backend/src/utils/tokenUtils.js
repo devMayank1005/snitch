@@ -7,7 +7,7 @@ import { config } from "../config/config.js";
  * @returns {string} JWT token
  */
 export const generateAccessToken = (userId) => {
-  return jwt.sign({ userId }, config.jwtAccessSecret, {
+  return jwt.sign({ userId }, config.JWT_ACCESS_SECRET, {
     expiresIn: config.jwtAccessExpiry,
   });
 };
@@ -18,7 +18,7 @@ export const generateAccessToken = (userId) => {
  * @returns {string} JWT token
  */
 export const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, config.jwtRefreshSecret, {
+  return jwt.sign({ userId }, config.JWT_REFRESH_SECRET, {
     expiresIn: config.jwtRefreshExpiry,
   });
 };
@@ -30,7 +30,7 @@ export const generateRefreshToken = (userId) => {
  */
 export const verifyAccessToken = (token) => {
   try {
-    return jwt.verify(token, config.jwtAccessSecret);
+    return jwt.verify(token, config.JWT_ACCESS_SECRET);
   } catch (error) {
     return null;
   }
@@ -43,7 +43,7 @@ export const verifyAccessToken = (token) => {
  */
 export const verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, config.jwtRefreshSecret);
+    return jwt.verify(token, config.JWT_REFRESH_SECRET);
   } catch (error) {
     return null;
   }

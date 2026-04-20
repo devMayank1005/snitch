@@ -6,6 +6,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import authRouter from "./routes/auth.route.js";
 import { handleGoogleOAuthProfile } from "./services/googleAuth.service.js";
+import productRouter from "./routes/product.route.js";
 
 const app = express();
 const googleCallbackUrl =
@@ -54,6 +55,7 @@ app.get("/", (req, res) => {
 
 // Other routes
 app.use("/api/auth", authRouter);
+app.use("/api/products", productRouter);
 
 // 404
 app.use((req, res) => {
@@ -62,6 +64,8 @@ app.use((req, res) => {
     message: "Route not found",
   });
 });
+
+
 
 // Error handler
 app.use((error, req, res, next) => {

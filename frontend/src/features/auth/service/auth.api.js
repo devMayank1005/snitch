@@ -141,6 +141,20 @@ export async function verifyEmail(token) {
 }
 
 /**
+ * Resend verification email
+ */
+export async function resendVerificationEmail(email) {
+  try {
+    const response = await authApiInstance.post("/resend-verification-email", {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
  * Refresh access token
  */
 export async function refreshAccessToken(refreshToken) {

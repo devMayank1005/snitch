@@ -92,6 +92,18 @@ export const validatePasswordResetRequest = [
 ];
 
 /**
+ * Validation middleware for resend email verification request
+ */
+export const validateResendVerificationEmail = [
+  body("email")
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  validateRequest,
+];
+
+/**
  * Validation middleware for password reset confirmation
  */
 export const validatePasswordReset = [

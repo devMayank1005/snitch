@@ -4,6 +4,7 @@ import {
   registerUser,
   loginUser,
   verifyEmail,
+  resendVerificationEmail,
   refreshAccessToken,
   logoutUser,
   requestPasswordReset,
@@ -15,6 +16,7 @@ import {
   validateRegister,
   validateLogin,
   validateEmailVerification,
+  validateResendVerificationEmail,
   validatePasswordResetRequest,
   validatePasswordReset,
 } from "../validator/auth.validator.js";
@@ -44,6 +46,11 @@ router.get(
 router.post("/register", validateRegister, registerUser);
 router.post("/login", validateLogin, loginUser);
 router.get("/verify-email/:token", validateEmailVerification, verifyEmail);
+router.post(
+  "/resend-verification-email",
+  validateResendVerificationEmail,
+  resendVerificationEmail
+);
 
 // Token management
 router.post("/refresh", refreshAccessToken);
