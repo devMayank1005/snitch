@@ -3,7 +3,7 @@ import { uploadFile } from "../services/storage.service.js";
 
 export async function createProduct(req, res) {
   try {
-    const { title, description, priceAmount, priceCurrency } = req.body;
+    const { title, description, priceAmount, priceCurrency,category,price } = req.body;
     const seller = req.user;
     const sellerId = seller.userId;
 
@@ -14,10 +14,10 @@ export async function createProduct(req, res) {
       });
     }
 
-    if (!title || !description || !category || !price?.amount) {
+    if (!title || !description || !category || !priceAmount) {
       return res.status(400).json({
         success: false,
-        message: "title, description, category and price.amount are required",
+        message: "title, description, category and priceamount are required",
       });
     }
 

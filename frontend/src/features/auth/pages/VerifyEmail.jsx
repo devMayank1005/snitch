@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../hook/useAuth.js";
 
@@ -13,6 +13,8 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
   const { handleVerifyEmail, auth } = useAuth();
   const [verified, setVerified] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const hasAttemptedRef = useRef(false);
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -26,7 +28,13 @@ export default function VerifyEmail() {
       }
     };
 
-    if (token) {
+    if (!token) {
+      setLocalError("Verification token is missing or invalid.");
+      return;
+    }
+
+    if (!hasAttemptedRef.current) {
+      hasAttemptedRef.current = true;
       verifyEmail();
     }
   }, [token, navigate, handleVerifyEmail]);
@@ -70,7 +78,7 @@ export default function VerifyEmail() {
                   Continue to Login
                 </button>
               </div>
-            ) : auth?.error ? (
+            ) : (auth?.error || localError) ? (
               // Error state
               <div className="text-center py-10">
                 <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-gradient-to-br from-red-600 to-rose-600 shadow-xl shadow-red-600/20">
@@ -81,7 +89,7 @@ export default function VerifyEmail() {
                 <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">Verification Failed</h2>
                 <p className="text-red-600 dark:text-red-400 text-sm font-medium mb-6 flex items-start gap-2 justify-center">
                   <IconError />
-                  <span>{auth.error}</span>
+                  <span>{auth.error || localError}</span>
                 </p>
                 <div className="space-y-3">
                   <button
