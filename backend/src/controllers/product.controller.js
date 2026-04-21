@@ -3,23 +3,9 @@ import { uploadFile } from "../services/storage.service.js";
 
 export async function createProduct(req, res) {
   try {
-    const { title, description, priceAmount, priceCurrency,category,price } = req.body;
+    const { title, description, priceAmount, priceCurrency,category } = req.body;
     const seller = req.user;
     const sellerId = seller.userId;
-
-    if (seller.role !== "seller") {
-      return res.status(403).json({
-        success: false,
-        message: "Only sellers can create products",
-      });
-    }
-
-    if (!title || !description || !category || !priceAmount) {
-      return res.status(400).json({
-        success: false,
-        message: "title, description, category and priceamount are required",
-      });
-    }
 
     const files = req.files || [];
 

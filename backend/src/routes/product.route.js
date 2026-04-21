@@ -6,6 +6,7 @@ import {
 	getSellerProducts,
 } from "../controllers/product.controller.js";
 import multer from "multer";
+import { createProductValidation } from "../validator/product.validator.js"; // Import the createProductValidation from "../validator/product.validator.js";
 
 
 const upload = multer({
@@ -14,7 +15,7 @@ const upload = multer({
 })
 const router = express.Router();
 
-router.post("/", requireAuth, requireRole("seller"), upload.array("images",7), createProduct);
+router.post("/", requireAuth, requireRole("seller"),upload.array("images",7), createProductValidation ,createProduct);
 router.get("/mine", requireAuth, requireRole("seller"), getSellerProducts);
 
 export default router;
