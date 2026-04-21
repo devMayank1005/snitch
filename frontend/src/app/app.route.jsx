@@ -53,7 +53,11 @@ export const routes = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    element: withSuspense(<AuthDashboard />),
+    element: (
+      <ProtectedRoute>
+        {withSuspense(<AuthDashboard />)}
+      </ProtectedRoute>
+    ),
   },
   {
     element: <AppLayout />,
