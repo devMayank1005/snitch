@@ -2,12 +2,21 @@ import { createBrowserRouter } from "react-router";
 import { lazy, Suspense } from "react";
 import { Navigate } from "react-router";
 
+import Home from "../features/products/pages/Home";
+import ProductDetail from "../features/products/pages/ProductDetail";
+import SellerProductDetails from "../features/products/pages/SellerProductDetails";
+import CreateProduct from "../features/products/pages/CreateProduct";
+import SellerDashboard from "../features/products/pages/Dashboard";
+
+import AppLayout from "./AppLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
+
 const Register = lazy(() => import("../features/auth/pages/Register"));
 const Login = lazy(() => import("../features/auth/pages/Login"));
 const VerifyEmail = lazy(() => import("../features/auth/pages/VerifyEmail"));
 const ForgotPassword = lazy(() => import("../features/auth/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../features/auth/pages/ResetPassword"));
-const Dashboard = lazy(() => import("../features/auth/pages/Dashboard"));
+const AuthDashboard = lazy(() => import("../features/auth/pages/Dashboard"));
 
 const withSuspense = (element) => (
   <Suspense
@@ -22,10 +31,6 @@ const withSuspense = (element) => (
 );
 
 export const routes = createBrowserRouter([
-  {
-    path: "/",
-    element: <Navigate to="/dashboard" replace />,
-  },
   {
     path: "/register",
     element: withSuspense(<Register />),
@@ -48,6 +53,52 @@ export const routes = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    element: withSuspense(<Dashboard />),
+    element: withSuspense(<AuthDashboard />),
   },
+  {
+    element: <AppLayout />,
+    children: [
+      {
+        path: "/",
+        element: <Home />,
+      },
+      {
+        path: "/product/:productId",
+        element: <ProductDetail />
+      },
+      {
+        path: "/seller",
+        children: [
+          {
+            index: true,
+            element: <Navigate to="dashboard" replace />
+          },
+          {
+            path: "create-product",
+            element: (
+              <ProtectedRoute>
+                <CreateProduct />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "dashboard",
+            element: (
+              <ProtectedRoute>
+                <SellerDashboard />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "product/:productId",
+            element: (
+              <ProtectedRoute>
+                <SellerProductDetails />
+              </ProtectedRoute>
+            )
+          }
+        ]
+      }
+    ]
+  }
 ]);
