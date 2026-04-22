@@ -70,7 +70,13 @@ export async function getSellerProducts(req, res) {
 
 export async function getAllProducts(req, res) {
   try {
-    const products = await Product.find()
+    const { category, search } = req.query;
+    let query = {};
+    
+    if (category) query.category = category;
+    if (search) query.title = { $regex: search, $options: "i" };
+
+    const products = await Product.find(query).sort({ createdAt: -1 });
 
     return res.status(200).json({
         message: "Products fetched successfully",

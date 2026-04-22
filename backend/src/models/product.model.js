@@ -29,11 +29,36 @@ const productSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    variants: [
+      {
+        images: [
+          {
+            url: String,
+            publicId: String,
+          },
+        ],
+        price: {
+          amount: Number,
+          currency: {
+            type: String,
+            default: "INR",
+          },
+        },
+        stock: {
+          type: Number,
+          default: 0,
+        },
+        attributes: {
+          type: Map,
+          of: String, // e.g. { "Size": "M", "Color": "Black" }
+        },
+      },
+    ],
     images: [
       {
         url: String,
-        publicId: String, // For cloud storage reference
-      },            
+        publicId: String,
+      },
     ],
   },
   {

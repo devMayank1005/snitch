@@ -16,8 +16,9 @@ export async function getSellerProduct() {
     return response.data
 }
 
-export async function getAllProducts() {
-    const response = await productApiInstance.get("/")
+export async function getAllProducts(query = {}) {
+    const params = new URLSearchParams(query).toString();
+    const response = await productApiInstance.get("/" + (params ? `?${params}` : ""))
     return response.data
 }
 
