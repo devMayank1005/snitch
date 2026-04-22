@@ -6,7 +6,7 @@ const productApiInstance = axios.create({
 })
 
 export async function createProduct(formData) {
-    const response = await productApiInstance.post("/", formData)
+    const response = await productApiInstance.post("/create", formData)
 
     return response.data
 }
@@ -28,9 +28,6 @@ export async function getProductById(productId) {
 }
 
 export async function addProductVariant(productId, newProductVariant) {
-
-    console.log(newProductVariant)
-
     const formData = new FormData()
 
     newProductVariant.images.forEach((image) => {

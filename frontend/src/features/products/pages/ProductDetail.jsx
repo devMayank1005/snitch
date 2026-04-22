@@ -77,6 +77,12 @@ const ProductDetail = () => {
     }, [displayImages.length]);
 
     const handleSelectVariant = (variant) => {
+        console.log('🔄 Selecting variant:', { 
+            variantId: variant._id, 
+            variantStock: variant.stock,
+            variantTitle: variant.title,
+            allVariantKeys: Object.keys(variant)
+        });
         setSelectedVariantId(variant._id);
         setActiveVariant(variant);
         setActiveImage(0); // reset viewer
@@ -88,20 +94,38 @@ const ProductDetail = () => {
         else setDisplayImages(product.images);
     };
 
-    const addToCart = async () => {
+    const addToCart = async ({ redirectToCart = true } = {}) => {
         if (!auth?.isAuthenticated) {
             navigate('/login');
             return false;
         }
 
         try {
+            const productIdToAdd = selectedVariantId || product._id;
+            console.log('🛒 Add to Cart clicked. About to send request:', { 
+                productIdToAdd, 
+                selectedVariantId,
+                productId: product._id,
+                quantity: 1,
+                activeVariant: activeVariant ? { 
+                    stock: activeVariant.stock,
+                    title: activeVariant.title,
+                    _id: activeVariant._id
+                } : null,
+                isVariant: !!selectedVariantId,
+                timestamp: new Date().toISOString()
+            });
             await handleAddToCart({ 
-                productId: selectedVariantId || product._id, 
+                productId: productIdToAdd, 
                 quantity: 1 
             });
-            alert("Added to Cart successfully.");
+            console.log('✅ Add to Cart succeeded');
+            if (redirectToCart) {
+                navigate('/cart');
+            }
             return true;
         } catch (error) {
+            console.error('❌ Add to cart error:', error);
             alert("Failed to add to cart.");
             return false;
         }
@@ -112,7 +136,7 @@ const ProductDetail = () => {
             navigate('/login');
             return;
         }
-        const success = await addToCart();
+        const success = await addToCart({ redirectToCart: false });
         if (success) {
             alert("Redirecting to checkout...");
             // navigate('/checkout');

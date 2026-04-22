@@ -1,6 +1,75 @@
 import { UserModel } from "../models/user.model.js";
 import Product from "../models/product.model.js";
 
+async function repairCartSnapshots(user) {
+  const productIds = user.cart.map((item) => item.product);
+  if (productIds.length === 0) {
+    return false;
+  }
+
+  const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
+  const productMap = {};
+  liveProducts.forEach((product) => {
+    productMap[product._id.toString()] = product;
+  });
+
+  let repaired = false;
+
+  for (let i = user.cart.length - 1; i >= 0; i--) {
+    const item = user.cart[i];
+    const liveProduct = productMap[item.product.toString()];
+
+    if (!liveProduct) {
+      user.cart.splice(i, 1);
+      repaired = true;
+      continue;
+    }
+
+    const livePrice = liveProduct.price || {};
+    const currentSnapshot = item.priceSnapshot || {};
+
+    if (currentSnapshot.amount === undefined || currentSnapshot.currency === undefined) {
+      user.cart[i].priceSnapshot = {
+        amount: livePrice.amount,
+        currency: livePrice.currency,
+      };
+      user.cart[i].attributesSnapshot = liveProduct.attributes || {};
+      user.cart[i].titleSnapshot = liveProduct.title;
+      user.cart[i].imageSnapshot = liveProduct.images && liveProduct.images.length > 0 ? liveProduct.images[0].url : '';
+      user.cart[i].stockSnapshot = liveProduct.stock || 0;
+      user.cart[i].parentProductId = liveProduct.parentProductId;
+      repaired = true;
+    }
+  }
+
+  return repaired;
+}
+
+async function removeParentItemsWhenVariantsExist(user) {
+  if (!user.cart.length) {
+    return false;
+  }
+
+  const parentIdsWithVariants = new Set();
+  user.cart.forEach((item) => {
+    if (item.parentProductId) {
+      parentIdsWithVariants.add(item.parentProductId.toString());
+    }
+  });
+
+  if (parentIdsWithVariants.size === 0) {
+    return false;
+  }
+
+  const originalLength = user.cart.length;
+  user.cart = user.cart.filter((item) => {
+    const productId = item.product.toString();
+    return !parentIdsWithVariants.has(productId);
+  });
+
+  return user.cart.length !== originalLength;
+}
+
 // --- CART LOGIC ---
 export async function getCart(req, res) {
   try {
@@ -39,6 +108,11 @@ export async function getCart(req, res) {
     if (needsHealing) {
         // Silently push the repaired array map backing the schema bounds natively!
         await user.save({ validateModifiedOnly: true }); 
+    }
+
+    const canonicalized = await removeParentItemsWhenVariantsExist(user);
+    if (canonicalized) {
+      await user.save({ validateModifiedOnly: true });
     }
 
     // Revalidation Pipeline (Safely operating on mathematically guaranteed Snapshots)
@@ -82,7 +156,32 @@ export async function getCart(req, res) {
 export async function addToCart(req, res) {
   try {
     const { productId, quantity = 1 } = req.body;
+    const safeQuantity = Number(quantity) || 1;
+    
+    console.log('📥 addToCart received:', { 
+      productId, 
+      quantityFromBody: quantity,
+      safeQuantity, 
+      bodyKeys: Object.keys(req.body),
+      type: typeof quantity
+    });
+    
     const user = await UserModel.findById(req.user.userId);
+
+    const repaired = await repairCartSnapshots(user);
+    if (repaired) {
+      await user.save({ validateModifiedOnly: true });
+    }
+
+    const liveProduct = await Product.findById(productId);
+    if (!liveProduct) {
+        return res.status(404).json({ success: false, message: "Product no longer exists." });
+    }
+
+    if (liveProduct.parentProductId) {
+      const parentId = liveProduct.parentProductId.toString();
+      user.cart = user.cart.filter((item) => item.product.toString() !== parentId);
+    }
 
     // 1. Check Idempotency (Variant Only)
     const existingItemIndex = user.cart.findIndex(
@@ -90,19 +189,31 @@ export async function addToCart(req, res) {
     );
 
     if (existingItemIndex > -1) {
-      user.cart[existingItemIndex].quantity += Number(quantity);
-    } else {
-      // 2. Retrieve Live Product Data for Snapshot Creation
-      const liveProduct = await Product.findById(productId);
-      if (!liveProduct) {
-          return res.status(404).json({ success: false, message: "Product no longer exists." });
+      const newQuantity = user.cart[existingItemIndex].quantity + safeQuantity;
+      console.log('📦 Item exists, updating quantity:', { 
+        previousQuantity: user.cart[existingItemIndex].quantity, 
+        offset: safeQuantity,
+        newQuantity: newQuantity
+      });
+      
+      if (newQuantity <= 0) {
+        return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
-
-      // 3. Bake the Immutable Snapshot Payload
+      
+      user.cart[existingItemIndex].quantity = newQuantity;
+    } else {
+      // New item must have positive quantity
+      if (safeQuantity <= 0) {
+        console.warn('⚠️ INVALID QUANTITY FOR NEW ITEM:', { safeQuantity, original: quantity });
+        return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
+      }
+      
+      console.log('📦 New item, setting quantity to:', { quantity: safeQuantity, liveProductStock: liveProduct.stock });
+      // 2. Bake the Immutable Snapshot Payload
       user.cart.push({ 
         product: productId, 
         parentProductId: liveProduct.parentProductId,
-        quantity,
+        quantity: safeQuantity,
         priceSnapshot: { amount: liveProduct.price.amount, currency: liveProduct.price.currency },
         attributesSnapshot: liveProduct.attributes || {},
         stockSnapshot: liveProduct.stock || 0,
@@ -111,7 +222,15 @@ export async function addToCart(req, res) {
       });
     }
 
+    const canonicalized = await removeParentItemsWhenVariantsExist(user);
+    if (canonicalized) {
+      await user.save({ validateModifiedOnly: true });
+      console.log('📤 Response: cart with canonicalization:', user.cart.map(c => ({ product: c.product, quantity: c.quantity })));
+      return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
+    }
+
     await user.save();
+    console.log('📤 Response: final cart:', user.cart.map(c => ({ product: c.product, quantity: c.quantity })));
     return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
   } catch (error) {
     console.error("Error adding to cart:", error);

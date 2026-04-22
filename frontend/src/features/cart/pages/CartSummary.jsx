@@ -1,10 +1,11 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { selectCartSubtotal, selectCartAlerts } from '../state/cart.slice';
+import { selectCartSubtotal, selectCartAlerts, selectCartCurrency } from '../state/cart.slice';
 
 const CartSummary = React.memo(() => {
     // 1. Hook directly into stable selectors
     const subtotal = useSelector(selectCartSubtotal);
+    const currency = useSelector(selectCartCurrency);
     const { hasUnavailable, canCheckout } = useSelector(selectCartAlerts);
 
     const handleCheckout = () => {
@@ -22,7 +23,7 @@ const CartSummary = React.memo(() => {
            <div className="space-y-4 mb-8">
                <div className="flex justify-between text-sm tracking-wide" style={{ color: '#7A6E63' }}>
                    <span>Subtotal</span>
-                   <span style={{ color: '#1B1C1A' }}>USD {subtotal.toLocaleString()}</span>
+                   <span style={{ color: '#1B1C1A' }}>{currency} {subtotal.toLocaleString()}</span>
                </div>
                <div className="flex justify-between text-sm tracking-wide" style={{ color: '#7A6E63' }}>
                    <span>Shipping</span>
@@ -38,7 +39,7 @@ const CartSummary = React.memo(() => {
                <div className="flex justify-between items-center">
                    <span className="text-sm uppercase tracking-widest font-bold" style={{ color: '#1B1C1A' }}>Total</span>
                    <span className="text-xl font-medium" style={{ fontFamily: "'Cormorant Garamond', serif", color: '#1B1C1A' }}>
-                       USD {subtotal.toLocaleString()}
+                       {currency} {subtotal.toLocaleString()}
                    </span>
                </div>
            </div>

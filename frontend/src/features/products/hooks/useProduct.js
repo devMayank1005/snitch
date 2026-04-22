@@ -10,7 +10,7 @@ export const useProduct = () => {
 
     async function handleCreateProduct(formData) {
         const data = await createProduct(formData)
-        return data.product
+        return data.data || data.product
     }
 
     async function handleGetSellerProduct() {
@@ -32,7 +32,7 @@ export const useProduct = () => {
     async function handleAddProductVariant(productId, newProductVariant) {
         const data = await addProductVariant(productId, newProductVariant)
 
-        return data
+        return data.product || data.data || data
     }
 
     return { handleCreateProduct, handleGetSellerProduct, handleGetAllProducts, handleGetProductById ,handleAddProductVariant}

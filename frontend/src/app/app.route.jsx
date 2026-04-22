@@ -89,7 +89,7 @@ export const routes = createBrowserRouter([
           {
             path: "create-product",
             element: (
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="seller">
                 <CreateProduct />
               </ProtectedRoute>
             )
@@ -97,7 +97,7 @@ export const routes = createBrowserRouter([
           {
             path: "dashboard",
             element: (
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="seller">
                 <SellerDashboard />
               </ProtectedRoute>
             )
@@ -105,7 +105,7 @@ export const routes = createBrowserRouter([
           {
             path: "product/:productId",
             element: (
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="seller">
                 <SellerProductDetails />
               </ProtectedRoute>
             )

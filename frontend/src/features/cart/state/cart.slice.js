@@ -61,8 +61,26 @@ export const selectAllCartItems = createSelector(
   (cart) => cart.allIds.map(id => cart.cartItemsById[id])
 );
 
-export const selectCartSubtotal = createSelector(
+export const selectCanonicalCartItems = createSelector(
   [selectAllCartItems],
+  (items) => {
+      const parentProductIdsWithVariants = new Set();
+
+      items.forEach((item) => {
+          if (item.parentProductId) {
+              parentProductIdsWithVariants.add(item.parentProductId.toString());
+          }
+      });
+
+      return items.filter((item) => {
+          const productId = item.product?.toString?.() || String(item.product);
+          return !parentProductIdsWithVariants.has(productId);
+      });
+  }
+);
+
+export const selectCartSubtotal = createSelector(
+  [selectCanonicalCartItems],
   (items) => {
       // Calculate securely off locked priceSnapshots natively isolating calculations
       return items.reduce((total, item) => {
@@ -75,7 +93,7 @@ export const selectCartSubtotal = createSelector(
 );
 
 export const selectGroupedCartItems = createSelector(
-  [selectAllCartItems],
+  [selectCanonicalCartItems],
   (items) => {
       const groups = {};
       items.forEach(item => {
@@ -96,7 +114,7 @@ export const selectGroupedCartItems = createSelector(
 );
 
 export const selectCartAlerts = createSelector(
-  [selectAllCartItems],
+  [selectCanonicalCartItems],
   (items) => {
       const hasUnavailable = items.some(item => item.isUnavailable);
       const hasPriceDrift = items.some(item => item.priceDrift);
@@ -106,6 +124,14 @@ export const selectCartAlerts = createSelector(
           hasPriceDrift,
           canCheckout: !hasUnavailable && items.length > 0
       };
+  }
+);
+
+export const selectCartCurrency = createSelector(
+  [selectCanonicalCartItems],
+  (items) => {
+      const firstCurrency = items.find(item => item.priceSnapshot?.currency)?.priceSnapshot?.currency;
+      return firstCurrency || "INR";
   }
 );
 

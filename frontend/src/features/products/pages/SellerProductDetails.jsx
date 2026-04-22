@@ -78,10 +78,9 @@ const SellerProductDetails = () => {
         : undefined // price is optional
     };
 
-    setLocalVariants([ ...localVariants, variantToSave ]);
+    const savedVariant = await handleAddProductVariant(productId, variantToSave)
+    setLocalVariants([ ...localVariants, savedVariant ]);
     setIsAddingVariant(false);
-
-    await handleAddProductVariant(productId, variantToSave)
 
     // Reset form
     // Note: should ideally revoke old object URLs as well to prevent memory leaks if it were a long-lived SPA
