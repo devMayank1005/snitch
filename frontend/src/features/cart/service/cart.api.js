@@ -1,41 +1,29 @@
-import axios from "axios";
-import { store } from "../../../app/app.store";
+import authApiInstance from "../../auth/service/auth.api";
 
-const cartApiInstance = axios.create({
-    baseURL: "/api/user",
-    withCredentials: true,
-});
-
-cartApiInstance.interceptors.request.use(config => {
-    const state = store.getState();
-    const token = state.auth.token;
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+// We use authApiInstance and override baseURL: '' so it inherits 
+// the robust token-refresh interceptors without defaulting to /api/auth
 
 export async function fetchCart() {
-    const response = await cartApiInstance.get("/");
+    const response = await authApiInstance.get("/api/user/", { baseURL: '' });
     return response.data;
 }
 
 export async function addToCartAPI(productId, variantId, quantity) {
-    const response = await cartApiInstance.post("/add", { productId, variantId, quantity });
+    const response = await authApiInstance.post("/api/user/add", { productId, variantId, quantity }, { baseURL: '' });
     return response.data;
 }
 
 export async function removeFromCartAPI(productId, variantId) {
-    const response = await cartApiInstance.post("/remove", { productId, variantId });
+    const response = await authApiInstance.post("/api/user/remove", { productId, variantId }, { baseURL: '' });
     return response.data;
 }
 
 export async function fetchWishlist() {
-    const response = await cartApiInstance.get("/wishlist");
+    const response = await authApiInstance.get("/api/user/wishlist", { baseURL: '' });
     return response.data;
 }
 
 export async function toggleWishlistAPI(productId) {
-    const response = await cartApiInstance.post("/wishlist/toggle", { productId });
+    const response = await authApiInstance.post("/api/user/wishlist/toggle", { productId }, { baseURL: '' });
     return response.data;
 }

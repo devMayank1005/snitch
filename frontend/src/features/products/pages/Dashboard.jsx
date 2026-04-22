@@ -119,7 +119,15 @@ const Dashboard = () => {
                                                 {product.description}
                                             </p>
 
-                                            <div className="mt-2">
+                                            {product.variantSummary && (
+                                                <div className="mt-1">
+                                                    <p className="text-[10px] font-medium tracking-wide uppercase" style={{ color: '#C9A96E' }}>
+                                                        {product.variantSummary}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="mt-2 flex items-center justify-between">
                                                 <span
                                                     className="text-[10px] uppercase tracking-[0.2em] font-medium"
                                                     style={{ color: '#1b1c1a' }}

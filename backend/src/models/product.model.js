@@ -29,31 +29,24 @@ const productSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    variants: [
-      {
-        images: [
-          {
-            url: String,
-            publicId: String,
-          },
-        ],
-        price: {
-          amount: Number,
-          currency: {
-            type: String,
-            default: "INR",
-          },
-        },
-        stock: {
-          type: Number,
-          default: 0,
-        },
-        attributes: {
-          type: Map,
-          of: String, // e.g. { "Size": "M", "Color": "Black" }
-        },
-      },
-    ],
+    parentProductId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+      index: true,
+    },
+    variationStructure: {
+      type: [String],
+      default: undefined, // E.g. ["Size", "Color"]. Base product only.
+    },
+    attributes: {
+      type: Map,
+      of: String, // E.g. { "Size": "M", "Color": "Black" }. Variant specific.
+    },
+    stock: {
+      type: Number,
+      default: 0,
+    },
     images: [
       {
         url: String,

@@ -63,6 +63,19 @@ const ProductDetail = () => {
         fetchProduct();
     }, [productId]);
 
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (displayImages.length <= 1) return;
+            if (e.key === "ArrowRight") {
+                setActiveImage((prev) => (prev + 1) % displayImages.length);
+            } else if (e.key === "ArrowLeft") {
+                setActiveImage((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1));
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [displayImages.length]);
+
     const handleSelectVariant = (variant) => {
         setSelectedVariantId(variant._id);
         setActiveVariant(variant);
@@ -83,8 +96,7 @@ const ProductDetail = () => {
 
         try {
             await handleAddToCart({ 
-                productId: product._id, 
-                variantId: selectedVariantId, 
+                productId: selectedVariantId || product._id, 
                 quantity: 1 
             });
             alert("Added to Cart successfully.");
@@ -146,7 +158,7 @@ const ProductDetail = () => {
                 {/* ── Top Bar ── */}
                 <div className="max-w-7xl mx-auto px-8 lg:px-16 xl:px-24 pt-10 pb-12 flex items-center gap-5">
                     <button
-                        onClick={() => navigate(-1)}
+                          onClick={() => navigate(-1)}
                         className="text-lg transition-colors duration-200 leading-none"
                         style={{ color: '#B5ADA3' }}
                         aria-label="Go back"
@@ -173,12 +185,36 @@ const ProductDetail = () => {
                                 <HeartIcon filled={false} />
                             </button>
 
-                            <div className="aspect-[4/5] overflow-hidden bg-[#f5f3f0]">
+                            <div className="aspect-[4/5] overflow-hidden bg-[#f5f3f0] relative group/gallery">
                                 <img
                                     src={mainImageUrl}
                                     alt={product.title}
                                     className="w-full h-full object-cover transition-opacity duration-300"
                                 />
+                                
+                                {/* Overlay Navigation */}
+                                {displayImages.length > 1 && (
+                                    <>
+                                        <button 
+                                            onClick={() => setActiveImage((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1))}
+                                            className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white backdrop-blur-sm p-3 rounded-full opacity-0 group-hover/gallery:opacity-100 transition-all duration-300 z-10"
+                                            aria-label="Previous Image"
+                                        >
+                                            <svg className="w-5 h-5 text-[#1b1c1a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveImage((prev) => (prev + 1) % displayImages.length)}
+                                            className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white backdrop-blur-sm p-3 rounded-full opacity-0 group-hover/gallery:opacity-100 transition-all duration-300 z-10"
+                                            aria-label="Next Image"
+                                        >
+                                            <svg className="w-5 h-5 text-[#1b1c1a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                             
                             {/* Thumbnails */}
