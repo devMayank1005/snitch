@@ -7,6 +7,7 @@ import ProductDetail from "../features/products/pages/ProductDetail";
 import SellerProductDetails from "../features/products/pages/SellerProductDetails";
 import CreateProduct from "../features/products/pages/CreateProduct";
 import SellerDashboard from "../features/products/pages/Dashboard";
+import CartPage from "../features/cart/pages/CartPage";
 
 import AppLayout from "./AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -69,6 +70,14 @@ export const routes = createBrowserRouter([
       {
         path: "/product/:productId",
         element: <ProductDetail />
+      },
+      {
+        path: "/cart",
+        element: (
+          <ProtectedRoute>
+            <CartPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/seller",

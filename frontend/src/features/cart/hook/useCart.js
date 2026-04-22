@@ -31,10 +31,10 @@ export const useCart = () => {
         }
     }
 
-    async function handleAddToCart({ productId, variantId, quantity = 1 }) {
+    async function handleAddToCart({ productId, quantity = 1 }) {
         try {
-            const data = await addToCartAPI(productId, variantId, quantity);
-            dispatch(setCart(data.cart));
+            const data = await addToCartAPI(productId, quantity);
+            dispatch(setCart(data.cart)); // Sync normalized map completely
             return data;
         } catch (error) {
             console.error("Add to cart error:", error);
@@ -42,13 +42,33 @@ export const useCart = () => {
         }
     }
 
-    async function handleRemoveFromCart({ productId, variantId }) {
+    async function handleUpdateQuantity({ productId, newQuantity, previousQuantity }) {
         try {
-            const data = await removeFromCartAPI(productId, variantId);
-            dispatch(setCart(data.cart));
-            return data;
+            // 1. Optimistic Execution locally to eliminate latency bounds
+            dispatch(updateCartItemOptimistic({ productId, quantity: newQuantity }));
+            
+            // 2. Dispatch sync to Backend (offset mutation)
+            const offset = newQuantity - previousQuantity;
+            await addToCartAPI(productId, offset);
         } catch (error) {
-            console.error("Remove from cart error:", error);
+            console.error("Failed optimistic update, triggering exact local Rollback", error);
+            // 3. Precise Rollback without nuking the entire map
+            dispatch(updateCartItemOptimistic({ productId, quantity: previousQuantity }));
+            throw error;
+        }
+    }
+
+    async function handleRemoveFromCart({ productId, previousCartItemObject }) {
+        try {
+            // 1. Optimistic Nuke
+            dispatch(removeCartItemOptimistic({ productId }));
+            
+            // 2. Sync Sync Database
+            await removeFromCartAPI(productId);
+        } catch (error) {
+            console.error("Remove failed, pulling backup", error);
+            // Re-hydrate the map if database sync rejects
+            await handleGetCart();
             throw error;
         }
     }

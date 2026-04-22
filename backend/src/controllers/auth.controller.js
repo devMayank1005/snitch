@@ -24,7 +24,7 @@ const issueAuthCookies = async (user, res) => {
   const refreshTokenExpiry = new Date(refreshTokenDecoded.exp * 1000);
 
   await user.addRefreshToken(refreshToken, refreshTokenExpiry);
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
@@ -158,7 +158,7 @@ export const verifyEmail = async (req, res) => {
     user.emailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationTokenExpiry = undefined;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     return res.status(200).json({
       success: true,
@@ -358,7 +358,7 @@ export const logoutUser = async (req, res) => {
       const user = await UserModel.findById(userId);
       if (user) {
         user.revokeRefreshToken(refreshToken);
-        await user.save();
+        await user.save({ validateModifiedOnly: true });
       }
     }
 

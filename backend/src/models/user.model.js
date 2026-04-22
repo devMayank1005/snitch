@@ -59,13 +59,29 @@ const userSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-        variantId: {
-          type: mongoose.Schema.Types.ObjectId, // Optional if they added a specific variant
+        parentProductId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
         },
         quantity: {
           type: Number,
           default: 1,
           min: 1,
+        },
+        priceSnapshot: {
+          amount: { type: Number, required: true },
+          currency: { type: String, required: true },
+        },
+        attributesSnapshot: {
+          type: Map,
+          of: String,
+        },
+        stockSnapshot: Number,
+        titleSnapshot: String,
+        imageSnapshot: String,
+        snapshotCreatedAt: {
+          type: Date,
+          default: Date.now,
         },
       },
     ],
