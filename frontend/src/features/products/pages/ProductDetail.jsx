@@ -77,12 +77,6 @@ const ProductDetail = () => {
     }, [displayImages.length]);
 
     const handleSelectVariant = (variant) => {
-        console.log('🔄 Selecting variant:', { 
-            variantId: variant._id, 
-            variantStock: variant.stock,
-            variantTitle: variant.title,
-            allVariantKeys: Object.keys(variant)
-        });
         setSelectedVariantId(variant._id);
         setActiveVariant(variant);
         setActiveImage(0); // reset viewer
@@ -102,24 +96,10 @@ const ProductDetail = () => {
 
         try {
             const productIdToAdd = selectedVariantId || product._id;
-            console.log('🛒 Add to Cart clicked. About to send request:', { 
-                productIdToAdd, 
-                selectedVariantId,
-                productId: product._id,
-                quantity: 1,
-                activeVariant: activeVariant ? { 
-                    stock: activeVariant.stock,
-                    title: activeVariant.title,
-                    _id: activeVariant._id
-                } : null,
-                isVariant: !!selectedVariantId,
-                timestamp: new Date().toISOString()
-            });
             await handleAddToCart({ 
                 productId: productIdToAdd, 
                 quantity: 1 
             });
-            console.log('✅ Add to Cart succeeded');
             if (redirectToCart) {
                 navigate('/cart');
             }

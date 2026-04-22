@@ -9,12 +9,6 @@ export const useCart = () => {
         dispatch(setCartLoading(true));
         try {
             const data = await fetchCart();
-            console.log('📥 Cart fetched from API:', data.cart.map(item => ({ 
-                product: item.product, 
-                quantity: item.quantity,
-                title: item.titleSnapshot,
-                stock: item.stockSnapshot
-            })));
             dispatch(setCart(data.cart));
             return data.cart;
         } catch (error) {
@@ -40,10 +34,8 @@ export const useCart = () => {
     async function handleAddToCart({ productId, quantity = 1 }) {
         // Defensive: ensure quantity is always a number and never undefined/null
         const safeQuantity = Number(quantity) || 1;
-        console.log('📦 handleAddToCart called:', { productId, quantity, safeQuantity });
         try {
             const data = await addToCartAPI(productId, safeQuantity);
-            console.log('✅ Cart API response:', data);
             dispatch(setCart(data.cart)); // Sync normalized map completely
             return data;
         } catch (error) {

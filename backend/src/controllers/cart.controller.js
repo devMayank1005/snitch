@@ -158,14 +158,6 @@ export async function addToCart(req, res) {
     const { productId, quantity = 1 } = req.body;
     const safeQuantity = Number(quantity) || 1;
     
-    console.log('📥 addToCart received:', { 
-      productId, 
-      quantityFromBody: quantity,
-      safeQuantity, 
-      bodyKeys: Object.keys(req.body),
-      type: typeof quantity
-    });
-    
     const user = await UserModel.findById(req.user.userId);
 
     const repaired = await repairCartSnapshots(user);
@@ -190,11 +182,6 @@ export async function addToCart(req, res) {
 
     if (existingItemIndex > -1) {
       const newQuantity = user.cart[existingItemIndex].quantity + safeQuantity;
-      console.log('📦 Item exists, updating quantity:', { 
-        previousQuantity: user.cart[existingItemIndex].quantity, 
-        offset: safeQuantity,
-        newQuantity: newQuantity
-      });
       
       if (newQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
@@ -204,11 +191,8 @@ export async function addToCart(req, res) {
     } else {
       // New item must have positive quantity
       if (safeQuantity <= 0) {
-        console.warn('⚠️ INVALID QUANTITY FOR NEW ITEM:', { safeQuantity, original: quantity });
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
-      
-      console.log('📦 New item, setting quantity to:', { quantity: safeQuantity, liveProductStock: liveProduct.stock });
       // 2. Bake the Immutable Snapshot Payload
       user.cart.push({ 
         product: productId, 
@@ -225,12 +209,10 @@ export async function addToCart(req, res) {
     const canonicalized = await removeParentItemsWhenVariantsExist(user);
     if (canonicalized) {
       await user.save({ validateModifiedOnly: true });
-      console.log('📤 Response: cart with canonicalization:', user.cart.map(c => ({ product: c.product, quantity: c.quantity })));
       return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
     }
 
     await user.save();
-    console.log('📤 Response: final cart:', user.cart.map(c => ({ product: c.product, quantity: c.quantity })));
     return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
   } catch (error) {
     console.error("Error adding to cart:", error);

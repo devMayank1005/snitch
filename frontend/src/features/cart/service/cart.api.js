@@ -9,10 +9,7 @@ export async function fetchCart() {
 }
 
 export async function addToCartAPI(productId, quantity) {
-    const payload = { productId, quantity };
-    console.log('🌐 Sending to /api/user/add:', payload);
-    const response = await authApiInstance.post("/api/user/add", payload, { baseURL: '' });
-    console.log('🌐 Response from /api/user/add:', response.data);
+    const response = await authApiInstance.post("/api/user/add", { productId, quantity }, { baseURL: '' });
     return response.data;
 }
 
