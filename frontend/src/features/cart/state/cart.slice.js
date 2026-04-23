@@ -19,7 +19,7 @@ const cartSlice = createSlice({
       const newAllIds = [];
       
       items.forEach(item => {
-        const id = item.product; // productId represents the strictly unique Variant string
+        const id = item.itemKey || `${item.product}:${item.variantId || 'base'}`;
         newById[id] = item;
         newAllIds.push(id);
       });
@@ -30,16 +30,16 @@ const cartSlice = createSlice({
     },
     updateCartItemOptimistic(state, action) {
       // Invariant Protection check before committing mutation
-      const { productId, quantity } = action.payload;
-      if (state.cartItemsById[productId]) {
-          state.cartItemsById[productId].quantity = quantity;
+        const { itemKey, quantity } = action.payload;
+        if (state.cartItemsById[itemKey]) {
+          state.cartItemsById[itemKey].quantity = quantity;
       }
     },
     removeCartItemOptimistic(state, action) {
-      const { productId } = action.payload;
-      if (state.cartItemsById[productId]) {
-          delete state.cartItemsById[productId];
-          state.allIds = state.allIds.filter(id => id !== productId);
+        const { itemKey } = action.payload;
+        if (state.cartItemsById[itemKey]) {
+          delete state.cartItemsById[itemKey];
+          state.allIds = state.allIds.filter(id => id !== itemKey);
       }
     },
     setWishlist(state, action) {
@@ -63,20 +63,7 @@ export const selectAllCartItems = createSelector(
 
 export const selectCanonicalCartItems = createSelector(
   [selectAllCartItems],
-  (items) => {
-      const parentProductIdsWithVariants = new Set();
-
-      items.forEach((item) => {
-          if (item.parentProductId) {
-              parentProductIdsWithVariants.add(item.parentProductId.toString());
-          }
-      });
-
-      return items.filter((item) => {
-          const productId = item.product?.toString?.() || String(item.product);
-          return !parentProductIdsWithVariants.has(productId);
-      });
-  }
+  (items) => items
 );
 
 export const selectCartSubtotal = createSelector(
@@ -97,8 +84,7 @@ export const selectGroupedCartItems = createSelector(
   (items) => {
       const groups = {};
       items.forEach(item => {
-          // Absolute Grouping stability checking title fallback if un-parented
-          const groupKey = item.parentProductId || item.titleSnapshot || "Miscellaneous";
+          const groupKey = item.product || item.titleSnapshot || "Miscellaneous";
           
           if (!groups[groupKey]) {
               groups[groupKey] = {

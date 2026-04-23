@@ -8,13 +8,13 @@ export async function fetchCart() {
     return response.data;
 }
 
-export async function addToCartAPI(productId, quantity) {
-    const response = await authApiInstance.post("/api/user/add", { productId, quantity }, { baseURL: '' });
+export async function addToCartAPI(productId, quantity, variantId = null) {
+    const response = await authApiInstance.post("/api/user/add", { productId, quantity, variantId }, { baseURL: '' });
     return response.data;
 }
 
-export async function removeFromCartAPI(productId) {
-    const response = await authApiInstance.post("/api/user/remove", { productId }, { baseURL: '' });
+export async function removeFromCartAPI({ itemKey, productId }) {
+    const response = await authApiInstance.post("/api/user/remove", { itemKey, productId }, { baseURL: '' });
     return response.data;
 }
 

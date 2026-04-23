@@ -1,5 +1,66 @@
 import mongoose from "mongoose";
 
+const priceSchema = new mongoose.Schema(
+  {
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    currency: {
+      type: String,
+      enum: ["USD", "EUR", "GBP", "JPY", "CNY", "INR"],
+      default: "INR",
+    },
+  },
+  { _id: false }
+);
+
+const productImageSchema = new mongoose.Schema(
+  {
+    url: String,
+    publicId: String,
+  },
+  { _id: false }
+);
+
+const variantSchema = new mongoose.Schema(
+  {
+    sku: {
+      type: String,
+      trim: true,
+    },
+    attributes: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+    combinationKey: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    price: {
+      type: priceSchema,
+      required: false,
+    },
+    images: {
+      type: [productImageSchema],
+      default: [],
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { timestamps: true }
+);
+
 const productSchema = new mongoose.Schema(
   {
     title: {
@@ -10,16 +71,7 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    price: {
-      amount: {type: Number,
-      required: true,
-      }, 
-      currency: {
-        type: String,
-        enum: ["USD", "EUR", "GBP", "JPY", "CNY","INR"],
-        default: "INR",
-      },
-    },
+    price: priceSchema,
     category: {
       type: String,
       required: true,
@@ -29,33 +81,30 @@ const productSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    parentProductId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      default: null,
-      index: true,
-    },
     variationStructure: {
       type: [String],
-      default: undefined, // E.g. ["Size", "Color"]. Base product only.
+      default: [],
     },
-    attributes: {
-      type: Map,
-      of: String, // E.g. { "Size": "M", "Color": "Black" }. Variant specific.
+    images: {
+      type: [productImageSchema],
+      default: [],
     },
     stock: {
       type: Number,
       default: 0,
+      min: 0,
     },
-    images: [
-      {
-        url: String,
-        publicId: String,
-      },
-    ],
+    variants: {
+      type: [variantSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
   }
 );  
+
+productSchema.index({ seller: 1, createdAt: -1 });
+productSchema.index({ category: 1, createdAt: -1 });
+
 export default mongoose.model("Product", productSchema);

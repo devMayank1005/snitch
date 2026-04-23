@@ -59,9 +59,13 @@ const userSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-        parentProductId: {
+        variantId: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
+        },
+        itemKey: {
+          type: String,
+          required: true,
+          trim: true,
         },
         quantity: {
           type: Number,

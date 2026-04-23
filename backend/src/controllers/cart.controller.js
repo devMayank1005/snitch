@@ -1,11 +1,54 @@
 import { UserModel } from "../models/user.model.js";
 import Product from "../models/product.model.js";
 
-async function repairCartSnapshots(user) {
-  const productIds = user.cart.map((item) => item.product);
-  if (productIds.length === 0) {
-    return false;
+function buildItemKey(productId, variantId) {
+  return `${productId}:${variantId || "base"}`;
+}
+
+function toObjectEntries(mapLike) {
+  if (!mapLike) return {};
+  if (typeof mapLike.toObject === "function") return mapLike.toObject();
+  return { ...mapLike };
+}
+
+function resolveLiveSelection(product, variantId) {
+  if (!product) return null;
+
+  if (variantId) {
+    const variant = (product.variants || []).find(
+      (entry) => entry._id?.toString() === variantId.toString()
+    );
+
+    if (!variant || variant.isActive === false) {
+      return null;
+    }
+
+    const effectivePrice = variant.price?.amount !== undefined ? variant.price : product.price;
+    const effectiveImages = variant.images?.length ? variant.images : product.images;
+
+    return {
+      title: product.title,
+      attributes: toObjectEntries(variant.attributes),
+      stock: Number(variant.stock) || 0,
+      image: effectiveImages?.[0]?.url || "",
+      price: effectivePrice,
+      variantId: variant._id?.toString(),
+    };
   }
+
+  return {
+    title: product.title,
+    attributes: {},
+    stock: Number(product.stock) || 0,
+    image: product.images?.[0]?.url || "",
+    price: product.price,
+    variantId: null,
+  };
+}
+
+async function repairCartSnapshots(user) {
+  const productIds = user.cart.map((item) => item.product).filter(Boolean);
+  if (!productIds.length) return false;
 
   const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
   const productMap = {};
@@ -25,19 +68,28 @@ async function repairCartSnapshots(user) {
       continue;
     }
 
-    const livePrice = liveProduct.price || {};
-    const currentSnapshot = item.priceSnapshot || {};
+    const liveSelection = resolveLiveSelection(liveProduct, item.variantId);
+    if (!liveSelection) {
+      user.cart.splice(i, 1);
+      repaired = true;
+      continue;
+    }
 
-    if (currentSnapshot.amount === undefined || currentSnapshot.currency === undefined) {
+    const nextItemKey = buildItemKey(item.product.toString(), item.variantId?.toString());
+    if (!item.itemKey || item.itemKey !== nextItemKey) {
+      user.cart[i].itemKey = nextItemKey;
+      repaired = true;
+    }
+
+    if (!item.priceSnapshot || item.priceSnapshot.amount === undefined || item.priceSnapshot.currency === undefined) {
       user.cart[i].priceSnapshot = {
-        amount: livePrice.amount,
-        currency: livePrice.currency,
+        amount: liveSelection.price.amount,
+        currency: liveSelection.price.currency,
       };
-      user.cart[i].attributesSnapshot = liveProduct.attributes || {};
-      user.cart[i].titleSnapshot = liveProduct.title;
-      user.cart[i].imageSnapshot = liveProduct.images && liveProduct.images.length > 0 ? liveProduct.images[0].url : '';
-      user.cart[i].stockSnapshot = liveProduct.stock || 0;
-      user.cart[i].parentProductId = liveProduct.parentProductId;
+      user.cart[i].attributesSnapshot = liveSelection.attributes;
+      user.cart[i].titleSnapshot = liveSelection.title;
+      user.cart[i].imageSnapshot = liveSelection.image;
+      user.cart[i].stockSnapshot = liveSelection.stock;
       repaired = true;
     }
   }
@@ -45,105 +97,64 @@ async function repairCartSnapshots(user) {
   return repaired;
 }
 
-async function removeParentItemsWhenVariantsExist(user) {
-  if (!user.cart.length) {
-    return false;
-  }
-
-  const parentIdsWithVariants = new Set();
-  user.cart.forEach((item) => {
-    if (item.parentProductId) {
-      parentIdsWithVariants.add(item.parentProductId.toString());
-    }
-  });
-
-  if (parentIdsWithVariants.size === 0) {
-    return false;
-  }
-
-  const originalLength = user.cart.length;
-  user.cart = user.cart.filter((item) => {
-    const productId = item.product.toString();
-    return !parentIdsWithVariants.has(productId);
-  });
-
-  return user.cart.length !== originalLength;
-}
-
-// --- CART LOGIC ---
 export async function getCart(req, res) {
   try {
     const user = await UserModel.findById(req.user.userId);
-    let needsHealing = false;
 
-    // Batched Retrieval (Enterprise Optimization)
-    const productIds = user.cart.map(item => item.product);
-    const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
-    
-    // O(1) Lookup Map
-    const productMap = {};
-    liveProducts.forEach(p => { productMap[p._id.toString()] = p; });
-
-    // 0. Lazy Healer Protocol (Auto-Upgrade Legacy Schema)
-    for (let i = user.cart.length - 1; i >= 0; i--) {
-        const item = user.cart[i];
-        if (!item.priceSnapshot || item.priceSnapshot.amount === undefined) {
-            needsHealing = true;
-            const live = productMap[item.product.toString()];
-            if (!live) {
-                // Irrecoverable Legacy Orphan: physically rip it out
-                user.cart.splice(i, 1);
-            } else {
-                // Auto-Hydrate missing guarantees
-                user.cart[i].priceSnapshot = { amount: live.price.amount, currency: live.price.currency };
-                user.cart[i].attributesSnapshot = live.attributes || {};
-                user.cart[i].titleSnapshot = live.title;
-                user.cart[i].imageSnapshot = live.images && live.images.length > 0 ? live.images[0].url : '';
-                user.cart[i].stockSnapshot = live.stock || 0;
-                user.cart[i].parentProductId = live.parentProductId;
-            }
-        }
-    }
-
-    if (needsHealing) {
-        // Silently push the repaired array map backing the schema bounds natively!
-        await user.save({ validateModifiedOnly: true }); 
-    }
-
-    const canonicalized = await removeParentItemsWhenVariantsExist(user);
-    if (canonicalized) {
+    const repaired = await repairCartSnapshots(user);
+    if (repaired) {
       await user.save({ validateModifiedOnly: true });
     }
 
-    // Revalidation Pipeline (Safely operating on mathematically guaranteed Snapshots)
-    const processedCart = user.cart.map(item => {
-        const live = productMap[item.product.toString()];
-        const cartObj = item.toObject();
+    const productIds = user.cart.map((item) => item.product);
+    const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
+    const productMap = {};
+    liveProducts.forEach((product) => {
+      productMap[product._id.toString()] = product;
+    });
 
-        // 1. Ghost Protocol (Deleted Product Handling)
-        if (!live) {
-            cartObj.isUnavailable = true;
-            cartObj.revalidationWarning = "This item is no longer available.";
-            cartObj.isValid = false;
-            return cartObj;
-        }
+    const processedCart = user.cart.map((item) => {
+      const liveProduct = productMap[item.product.toString()];
+      const cartObj = item.toObject();
 
-        cartObj.isValid = true;
-        
-        // 2. Eventual Consistency Drift Checkers
-        if (live.price.amount !== item.priceSnapshot.amount) {
-            cartObj.priceDrift = { old: item.priceSnapshot.amount, new: live.price.amount };
-            cartObj.revalidationWarning = `Price altered from ${item.priceSnapshot.currency} ${item.priceSnapshot.amount} to ${live.price.currency} ${live.price.amount}. Validating final price at Checkout.`;
-        }
-
-        if (live.stock < item.quantity) {
-             cartObj.stockDrift = true;
-             cartObj.revalidationWarning = cartObj.revalidationWarning 
-                ? cartObj.revalidationWarning + " | Insufficient Stock" 
-                : "Requested quantity exceeds active inventory.";
-        }
-
+      if (!liveProduct) {
+        cartObj.isUnavailable = true;
+        cartObj.revalidationWarning = "This item is no longer available.";
+        cartObj.isValid = false;
         return cartObj;
+      }
+
+      const liveSelection = resolveLiveSelection(liveProduct, item.variantId);
+      if (!liveSelection) {
+        cartObj.isUnavailable = true;
+        cartObj.revalidationWarning = "This variant is no longer available.";
+        cartObj.isValid = false;
+        return cartObj;
+      }
+
+      cartObj.isValid = true;
+      cartObj.itemKey = buildItemKey(item.product.toString(), item.variantId?.toString());
+
+      if (
+        liveSelection.price.amount !== item.priceSnapshot?.amount ||
+        liveSelection.price.currency !== item.priceSnapshot?.currency
+      ) {
+        cartObj.priceDrift = {
+          old: item.priceSnapshot?.amount,
+          new: liveSelection.price.amount,
+        };
+        cartObj.revalidationWarning = `Price changed from ${item.priceSnapshot?.currency} ${item.priceSnapshot?.amount} to ${liveSelection.price.currency} ${liveSelection.price.amount}.`;
+      }
+
+      if (liveSelection.stock < item.quantity) {
+        cartObj.stockDrift = true;
+        cartObj.revalidationWarning = cartObj.revalidationWarning
+          ? `${cartObj.revalidationWarning} | Insufficient stock`
+          : "Requested quantity exceeds available stock.";
+      }
+
+      cartObj.stockSnapshot = liveSelection.stock;
+      return cartObj;
     });
 
     return res.status(200).json({ success: true, cart: processedCart });
@@ -155,9 +166,13 @@ export async function getCart(req, res) {
 
 export async function addToCart(req, res) {
   try {
-    const { productId, quantity = 1 } = req.body;
-    const safeQuantity = Number(quantity) || 1;
-    
+    const { productId, variantId = null, quantity = 1 } = req.body;
+    const safeQuantity = Number(quantity);
+
+    if (!Number.isFinite(safeQuantity) || safeQuantity === 0) {
+      return res.status(400).json({ success: false, message: "Quantity offset cannot be zero" });
+    }
+
     const user = await UserModel.findById(req.user.userId);
 
     const repaired = await repairCartSnapshots(user);
@@ -165,55 +180,60 @@ export async function addToCart(req, res) {
       await user.save({ validateModifiedOnly: true });
     }
 
-    const liveProduct = await Product.findById(productId);
+    const liveProduct = await Product.findById(productId).lean();
     if (!liveProduct) {
-        return res.status(404).json({ success: false, message: "Product no longer exists." });
+      return res.status(404).json({ success: false, message: "Product no longer exists." });
     }
 
-    if (liveProduct.parentProductId) {
-      const parentId = liveProduct.parentProductId.toString();
-      user.cart = user.cart.filter((item) => item.product.toString() !== parentId);
+    const liveSelection = resolveLiveSelection(liveProduct, variantId);
+    if (!liveSelection) {
+      return res.status(404).json({ success: false, message: "Variant no longer exists." });
     }
 
-    // 1. Check Idempotency (Variant Only)
-    const existingItemIndex = user.cart.findIndex(
-      (item) => item.product.toString() === productId
-    );
+    const itemKey = buildItemKey(productId, liveSelection.variantId || null);
+    const existingItemIndex = user.cart.findIndex((item) => item.itemKey === itemKey);
 
     if (existingItemIndex > -1) {
-      const newQuantity = user.cart[existingItemIndex].quantity + safeQuantity;
-      
+      const currentQty = user.cart[existingItemIndex].quantity;
+      const newQuantity = currentQty + safeQuantity;
+
       if (newQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
-      
+
+      if (newQuantity > liveSelection.stock) {
+        return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
+      }
+
       user.cart[existingItemIndex].quantity = newQuantity;
+      user.cart[existingItemIndex].stockSnapshot = liveSelection.stock;
     } else {
-      // New item must have positive quantity
       if (safeQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
-      // 2. Bake the Immutable Snapshot Payload
-      user.cart.push({ 
-        product: productId, 
-        parentProductId: liveProduct.parentProductId,
+
+      if (safeQuantity > liveSelection.stock) {
+        return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
+      }
+
+      user.cart.push({
+        product: productId,
+        variantId: liveSelection.variantId || undefined,
+        itemKey,
         quantity: safeQuantity,
-        priceSnapshot: { amount: liveProduct.price.amount, currency: liveProduct.price.currency },
-        attributesSnapshot: liveProduct.attributes || {},
-        stockSnapshot: liveProduct.stock || 0,
-        titleSnapshot: liveProduct.title,
-        imageSnapshot: liveProduct.images && liveProduct.images.length > 0 ? liveProduct.images[0].url : '',
+        priceSnapshot: {
+          amount: liveSelection.price.amount,
+          currency: liveSelection.price.currency,
+        },
+        attributesSnapshot: liveSelection.attributes,
+        stockSnapshot: liveSelection.stock,
+        titleSnapshot: liveSelection.title,
+        imageSnapshot: liveSelection.image,
       });
     }
 
-    const canonicalized = await removeParentItemsWhenVariantsExist(user);
-    if (canonicalized) {
-      await user.save({ validateModifiedOnly: true });
-      return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
-    }
-
     await user.save();
-    return res.status(200).json({ success: true, message: "Securely added to Cart.", cart: user.cart });
+    return res.status(200).json({ success: true, message: "Added to cart", cart: user.cart });
   } catch (error) {
     console.error("Error adding to cart:", error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -222,12 +242,14 @@ export async function addToCart(req, res) {
 
 export async function removeFromCart(req, res) {
   try {
-    const { productId } = req.body;
+    const { itemKey, productId } = req.body;
     const user = await UserModel.findById(req.user.userId);
 
-    user.cart = user.cart.filter(
-      (item) => item.product.toString() !== productId
-    );
+    if (itemKey) {
+      user.cart = user.cart.filter((item) => item.itemKey !== itemKey);
+    } else if (productId) {
+      user.cart = user.cart.filter((item) => item.product.toString() !== productId);
+    }
 
     await user.save();
     return res.status(200).json({ success: true, message: "Removed from cart", cart: user.cart });
@@ -237,10 +259,9 @@ export async function removeFromCart(req, res) {
   }
 }
 
-// --- WISHLIST LOGIC ---
 export async function getWishlist(req, res) {
   try {
-    const user = await UserModel.findById(req.user.userId).populate('wishlist');
+    const user = await UserModel.findById(req.user.userId).populate("wishlist");
     return res.status(200).json({ success: true, wishlist: user.wishlist });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
@@ -254,9 +275,9 @@ export async function toggleWishlist(req, res) {
 
     const index = user.wishlist.indexOf(productId);
     if (index > -1) {
-      user.wishlist.splice(index, 1); // remove
+      user.wishlist.splice(index, 1);
     } else {
-      user.wishlist.push(productId); // add
+      user.wishlist.push(productId);
     }
 
     await user.save();

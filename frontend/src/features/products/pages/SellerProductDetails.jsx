@@ -56,41 +56,47 @@ const SellerProductDetails = () => {
 
   // Handlers for New Variant Form
   const handleAddNewVariant = async () => {
-    // Validate required at least one attribute to be filled
-    const hasValidAttribute = attributeInputs.some(attr => attr.key.trim() && attr.value.trim());
-    if (!hasValidAttribute) {
-      alert("At least one valid attribute is required.");
-      return;
+    try {
+      // Validate required at least one attribute to be filled
+      const hasValidAttribute = attributeInputs.some(attr => attr.key.trim() && attr.value.trim());
+      if (!hasValidAttribute) {
+        alert("At least one valid attribute is required.");
+        return;
+      }
+
+      // Maps preview URL so the variant list can display the image locally
+      const cleanImages = newVariant.images.map(img => ({ url: img.previewUrl, file: img.file }));
+
+      // Attributes is already an object in newVariant, just use it safely
+      const cleanAttributes = { ...newVariant.attributes };
+
+      const variantToSave = {
+        images: cleanImages,
+        stock: Number(newVariant.stock),
+        attributes: cleanAttributes,
+        price: newVariant.price.amount
+          ? Number(newVariant.price.amount)
+          : undefined // price is optional
+      };
+
+      const savedVariant = await handleAddProductVariant(productId, variantToSave)
+      setLocalVariants([ ...localVariants, savedVariant ]);
+      setIsAddingVariant(false);
+
+      // Reset form
+      // Note: should ideally revoke old object URLs as well to prevent memory leaks if it were a long-lived SPA
+      setAttributeInputs([ { key: '', value: '' } ]);
+      setNewVariant({
+        images: [],
+        stock: 0,
+        attributes: {},
+        price: { amount: '', currency: 'INR' }
+      });
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || "Failed to save variant.";
+      alert(message);
+      console.error("Failed to add variant:", error);
     }
-
-    // Maps preview URL so the variant list can display the image locally
-    const cleanImages = newVariant.images.map(img => ({ url: img.previewUrl, file: img.file }));
-
-    // Attributes is already an object in newVariant, just use it safely
-    const cleanAttributes = { ...newVariant.attributes };
-
-    const variantToSave = {
-      images: cleanImages,
-      stock: Number(newVariant.stock),
-      attributes: cleanAttributes,
-      price: newVariant.price.amount
-        ? Number(newVariant.price.amount)
-        : undefined // price is optional
-    };
-
-    const savedVariant = await handleAddProductVariant(productId, variantToSave)
-    setLocalVariants([ ...localVariants, savedVariant ]);
-    setIsAddingVariant(false);
-
-    // Reset form
-    // Note: should ideally revoke old object URLs as well to prevent memory leaks if it were a long-lived SPA
-    setAttributeInputs([ { key: '', value: '' } ]);
-    setNewVariant({
-      images: [],
-      stock: 0,
-      attributes: {},
-      price: { amount: '', currency: 'INR' }
-    });
   };
 
   const handleAddAttribute = () => {

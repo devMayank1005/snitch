@@ -95,10 +95,10 @@ const ProductDetail = () => {
         }
 
         try {
-            const productIdToAdd = selectedVariantId || product._id;
             await handleAddToCart({ 
-                productId: productIdToAdd, 
-                quantity: 1 
+                productId: product._id,
+                variantId: selectedVariantId || null,
+                quantity: 1,
             });
             if (redirectToCart) {
                 navigate('/cart');

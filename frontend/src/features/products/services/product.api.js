@@ -43,3 +43,27 @@ export async function addProductVariant(productId, newProductVariant) {
     return response.data
 
 }
+
+export async function updateProductVariant(productId, variantId, payload) {
+    const formData = new FormData();
+
+    if (payload.stock !== undefined) formData.append("stock", payload.stock);
+    if (payload.priceAmount !== undefined) formData.append("priceAmount", payload.priceAmount);
+    if (payload.priceCurrency) formData.append("priceCurrency", payload.priceCurrency);
+    if (payload.attributes) formData.append("attributes", JSON.stringify(payload.attributes));
+    if (payload.isActive !== undefined) formData.append("isActive", payload.isActive);
+
+    if (Array.isArray(payload.images)) {
+        payload.images.forEach((image) => {
+            if (image.file) formData.append("images", image.file);
+        });
+    }
+
+    const response = await productApiInstance.patch(`/${productId}/variants/${variantId}`, formData);
+    return response.data;
+}
+
+export async function deleteProductVariant(productId, variantId) {
+    const response = await productApiInstance.delete(`/${productId}/variants/${variantId}`);
+    return response.data;
+}

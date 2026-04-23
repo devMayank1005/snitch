@@ -31,11 +31,11 @@ export const useCart = () => {
         }
     }
 
-    async function handleAddToCart({ productId, quantity = 1 }) {
+    async function handleAddToCart({ productId, quantity = 1, variantId = null }) {
         // Defensive: ensure quantity is always a number and never undefined/null
         const safeQuantity = Number(quantity) || 1;
         try {
-            const data = await addToCartAPI(productId, safeQuantity);
+            const data = await addToCartAPI(productId, safeQuantity, variantId);
             dispatch(setCart(data.cart)); // Sync normalized map completely
             return data;
         } catch (error) {
@@ -44,29 +44,29 @@ export const useCart = () => {
         }
     }
 
-    async function handleUpdateQuantity({ productId, newQuantity, previousQuantity }) {
+    async function handleUpdateQuantity({ itemKey, productId, variantId = null, newQuantity, previousQuantity }) {
         try {
             // 1. Optimistic Execution locally to eliminate latency bounds
-            dispatch(updateCartItemOptimistic({ productId, quantity: newQuantity }));
+            dispatch(updateCartItemOptimistic({ itemKey, quantity: newQuantity }));
             
             // 2. Dispatch sync to Backend (offset mutation)
             const offset = newQuantity - previousQuantity;
-            await addToCartAPI(productId, offset);
+            await addToCartAPI(productId, offset, variantId);
         } catch (error) {
             console.error("Failed optimistic update, triggering exact local Rollback", error);
             // 3. Precise Rollback without nuking the entire map
-            dispatch(updateCartItemOptimistic({ productId, quantity: previousQuantity }));
+            dispatch(updateCartItemOptimistic({ itemKey, quantity: previousQuantity }));
             throw error;
         }
     }
 
-    async function handleRemoveFromCart({ productId, previousCartItemObject }) {
+    async function handleRemoveFromCart({ itemKey, productId, previousCartItemObject }) {
         try {
             // 1. Optimistic Nuke
-            dispatch(removeCartItemOptimistic({ productId }));
+            dispatch(removeCartItemOptimistic({ itemKey }));
             
             // 2. Sync Sync Database
-            await removeFromCartAPI(productId);
+            await removeFromCartAPI({ itemKey, productId });
         } catch (error) {
             console.error("Remove failed, pulling backup", error);
             // Re-hydrate the map if database sync rejects

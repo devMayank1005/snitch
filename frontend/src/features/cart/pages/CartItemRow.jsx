@@ -18,20 +18,32 @@ const CartItemRow = React.memo(({ item }) => {
 
     const onIncrement = () => {
         if (isUnavailable || item.quantity >= (item.stockSnapshot || 10)) return; // Guard clause
-        handleUpdateQuantity({ productId: item.product, newQuantity: item.quantity + 1, previousQuantity: item.quantity });
+        handleUpdateQuantity({
+            itemKey: item.itemKey,
+            productId: item.product,
+            variantId: item.variantId,
+            newQuantity: item.quantity + 1,
+            previousQuantity: item.quantity,
+        });
     };
 
     const onDecrement = () => {
         if (isUnavailable) return;
         if (item.quantity === 1) {
-            handleRemoveFromCart({ productId: item.product });
+            handleRemoveFromCart({ itemKey: item.itemKey, productId: item.product });
         } else {
-            handleUpdateQuantity({ productId: item.product, newQuantity: item.quantity - 1, previousQuantity: item.quantity });
+            handleUpdateQuantity({
+                itemKey: item.itemKey,
+                productId: item.product,
+                variantId: item.variantId,
+                newQuantity: item.quantity - 1,
+                previousQuantity: item.quantity,
+            });
         }
     };
 
     const onRemove = () => {
-        handleRemoveFromCart({ productId: item.product });
+        handleRemoveFromCart({ itemKey: item.itemKey, productId: item.product });
     };
 
     return (
