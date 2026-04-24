@@ -15,6 +15,12 @@ import {
 
 const getFrontendUrl = () => process.env.FRONTEND_URL || "http://localhost:5174";
 
+const getCookieMaxAgeFromToken = (decodedToken, fallbackMs) => {
+  if (!decodedToken?.exp) return fallbackMs;
+  const remainingMs = decodedToken.exp * 1000 - Date.now();
+  return remainingMs > 0 ? remainingMs : fallbackMs;
+};
+
 const issueAuthCookies = async (user, res) => {
   const accessToken = generateAccessToken(user._id);
   const refreshToken = generateRefreshToken(user._id);
@@ -22,6 +28,7 @@ const issueAuthCookies = async (user, res) => {
   const accessTokenDecoded = decodeToken(accessToken);
   const refreshTokenDecoded = decodeToken(refreshToken);
   const refreshTokenExpiry = new Date(refreshTokenDecoded.exp * 1000);
+  const accessCookieMaxAge = getCookieMaxAgeFromToken(accessTokenDecoded, 2 * 60 * 60 * 1000);
 
   await user.addRefreshToken(refreshToken, refreshTokenExpiry);
   await user.save({ validateModifiedOnly: true });
@@ -30,7 +37,7 @@ const issueAuthCookies = async (user, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 60 * 60 * 1000,
+    maxAge: accessCookieMaxAge,
   });
 
   res.cookie("refreshToken", refreshToken, {
@@ -303,13 +310,15 @@ export const refreshAccessToken = async (req, res) => {
 
     // Generate new access token
     const newAccessToken = generateAccessToken(user._id);
+    const decodedAccessToken = decodeToken(newAccessToken);
+    const accessCookieMaxAge = getCookieMaxAgeFromToken(decodedAccessToken, 2 * 60 * 60 * 1000);
 
     // Set new access token in cookie
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 1000, // 1 hour
+      maxAge: accessCookieMaxAge,
     });
 
     return res.status(200).json({

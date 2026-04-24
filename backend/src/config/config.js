@@ -49,7 +49,7 @@ export const config = {
 
   JWT_ACCESS_SECRET: getRequiredEnv("JWT_ACCESS_SECRET"),
   JWT_REFRESH_SECRET: getRequiredEnv("JWT_REFRESH_SECRET"),
-  jwtAccessExpiry: "15m",
+  jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY?.trim() || "2h",
   jwtRefreshExpiry: "7d",
 
   IMAGE_KIT_PRIVATE_KEY: getRequiredEnv("IMAGE_KIT_PRIVATE_KEY"),

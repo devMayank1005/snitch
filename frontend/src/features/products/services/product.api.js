@@ -1,9 +1,27 @@
 import axios from "axios";
+import { store } from "../../../app/app.store.js";
 
 const productApiInstance = axios.create({
     baseURL: "/api/products",
     withCredentials: true,
-})
+});
+
+/**
+ * Request interceptor: Attach access token from Redux store to Authorization header
+ */
+productApiInstance.interceptors.request.use(
+  (config) => {
+    const state = store.getState();
+    const token = state.auth?.token;
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export async function createProduct(formData) {
     const response = await productApiInstance.post("/create", formData)
@@ -65,5 +83,10 @@ export async function updateProductVariant(productId, variantId, payload) {
 
 export async function deleteProductVariant(productId, variantId) {
     const response = await productApiInstance.delete(`/${productId}/variants/${variantId}`);
+    return response.data;
+}
+
+export async function deleteProduct(productId) {
+    const response = await productApiInstance.delete(`/${productId}`);
     return response.data;
 }

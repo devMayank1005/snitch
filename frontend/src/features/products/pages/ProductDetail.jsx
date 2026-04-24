@@ -130,6 +130,43 @@ const isExactVariantMatch = (variant, selectedAttributes = {}) => {
     return selectedKeys.every((key) => String(normalizedVariantAttributes[key]) === String(selectedNormalized[key]));
 };
 
+/**
+ * Get available attribute values for an axis based on currently selected attributes
+ * Only returns values that exist in variants matching the current selection
+ * Considers stock availability (must have stock > 0)
+ */
+const getAvailableAttributeValues = (variants = [], axisKey, selectedAttributes = {}) => {
+    const availableValues = new Set();
+
+    variants.forEach((variant) => {
+        // Skip variants with no stock
+        if (!variant.stock || variant.stock <= 0) return;
+        
+        const variantAttributes = toPlainAttributes(variant?.attributes || {});
+        const normalizedVariantAttrs = Object.fromEntries(
+            Object.entries(variantAttributes).map(([key, value]) => [normalizeAttributeKey(key), value])
+        );
+
+        // Check if this variant matches all currently selected attributes
+        const matchesSelection = Object.entries(selectedAttributes)
+            .filter(([, value]) => value) // Only check attributes that have been selected
+            .every(([key, selectedValue]) => {
+                const normalizedKey = normalizeAttributeKey(key);
+                return String(normalizedVariantAttrs[normalizedKey]) === String(selectedValue);
+            });
+
+        if (matchesSelection) {
+            const normalizedAxisKey = normalizeAttributeKey(axisKey);
+            const value = normalizedVariantAttrs[normalizedAxisKey];
+            if (value) {
+                availableValues.add(value);
+            }
+        }
+    });
+
+    return availableValues;
+};
+
 const ProductDetail = () => {
     const { productId } = useParams();
     const navigate = useNavigate();
@@ -447,31 +484,40 @@ const ProductDetail = () => {
                                         </button>
                                     </div>
 
-                                    {getVariantAttributeAxes(normalizedVariants, product.variationStructure || []).map((axis) => (
-                                        <div key={axis.key} className="mb-5">
-                                            <span className="text-[10px] uppercase tracking-[0.2em] font-medium block mb-3" style={{ color: '#B5ADA3' }}>
-                                                {axis.label}
-                                            </span>
-                                            <div className="flex flex-wrap gap-3">
-                                                {axis.values.map((value) => {
-                                                    const isSelected = String(selectedAttributes[axis.key] || '') === String(value);
-                                                    return (
-                                                        <button
-                                                            key={`${axis.key}:${value}`}
-                                                            onClick={() => handleSelectAttributeValue(axis.key, value)}
-                                                            className={`px-6 py-3 border transition-colors ${
-                                                                isSelected
-                                                                    ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
-                                                                    : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
-                                                            }`}
-                                                        >
-                                                            <span className="text-[10px] uppercase tracking-widest block">{value}</span>
-                                                        </button>
-                                                    );
-                                                })}
+                                    {getVariantAttributeAxes(normalizedVariants, product.variationStructure || []).map((axis) => {
+                                        const availableValues = getAvailableAttributeValues(normalizedVariants, axis.key, selectedAttributes);
+                                        return (
+                                            <div key={axis.key} className="mb-5">
+                                                <span className="text-[10px] uppercase tracking-[0.2em] font-medium block mb-3" style={{ color: '#B5ADA3' }}>
+                                                    {axis.label}
+                                                </span>
+                                                <div className="flex flex-wrap gap-3">
+                                                    {axis.values.map((value) => {
+                                                        const isSelected = String(selectedAttributes[axis.key] || '') === String(value);
+                                                        const isAvailable = availableValues.has(value);
+                                                        const isDisabled = !isAvailable;
+
+                                                        return (
+                                                            <button
+                                                                key={`${axis.key}:${value}`}
+                                                                onClick={() => !isDisabled && handleSelectAttributeValue(axis.key, value)}
+                                                                disabled={isDisabled}
+                                                                className={`px-6 py-3 border transition-colors ${
+                                                                    isDisabled
+                                                                        ? 'opacity-40 cursor-not-allowed border-[#d0c5b5] text-[#b5b5b5]'
+                                                                        : isSelected
+                                                                        ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
+                                                                        : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
+                                                                }`}
+                                                            >
+                                                                <span className="text-[10px] uppercase tracking-widest block">{value}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
 

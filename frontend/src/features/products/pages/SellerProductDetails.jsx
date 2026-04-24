@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useProduct } from '../hooks/useProduct';
-import { useParams } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 
 // Helper icons
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
@@ -19,6 +19,14 @@ const SellerProductDetails = () => {
   const [ isAddingVariant, setIsAddingVariant ] = useState(false);
   const [ loading, setLoading ] = useState(true);
 
+  // Delete confirmation modal state
+  const [ deleteConfirmation, setDeleteConfirmation ] = useState({
+    isOpen: false,
+    type: null, // 'product' or 'variant'
+    variantId: null,
+    isDeleting: false,
+  });
+
   // UI state for inputs to maintain focus
   const [ attributeInputs, setAttributeInputs ] = useState([ { key: '', value: '' } ]);
 
@@ -31,7 +39,8 @@ const SellerProductDetails = () => {
   });
 
   const { productId } = useParams();
-  const { handleGetProductById, handleAddProductVariant } = useProduct();
+  const navigate = useNavigate();
+  const { handleGetProductById, handleAddProductVariant, handleDeleteProductVariant, handleDeleteProduct } = useProduct();
 
   async function fetchProductDetails() {
     setLoading(true);
@@ -175,6 +184,48 @@ const SellerProductDetails = () => {
     setNewVariant(prev => ({ ...prev, images: updatedImages }));
   };
 
+  const handleDeleteVariant = async (variantId) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      type: 'variant',
+      variantId,
+      isDeleting: false,
+    });
+  };
+
+  const handleDeleteProductClick = async () => {
+    setDeleteConfirmation({
+      isOpen: true,
+      type: 'product',
+      variantId: null,
+      isDeleting: false,
+    });
+  };
+
+  const confirmDelete = async () => {
+    setDeleteConfirmation(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      if (deleteConfirmation.type === 'variant') {
+        await handleDeleteProductVariant(productId, deleteConfirmation.variantId);
+        setLocalVariants(localVariants.filter(v => v._id !== deleteConfirmation.variantId));
+      } else if (deleteConfirmation.type === 'product') {
+        await handleDeleteProduct(productId);
+        navigate('/seller/products');
+      }
+      setDeleteConfirmation({ isOpen: false, type: null, variantId: null, isDeleting: false });
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to delete.';
+      alert(message);
+      console.error('Failed to delete:', error);
+      setDeleteConfirmation(prev => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation({ isOpen: false, type: null, variantId: null, isDeleting: false });
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-[#fbf9f6] flex items-center justify-center text-[#1b1c1a] font-serif">Loading gallery...</div>;
   }
@@ -188,6 +239,12 @@ const SellerProductDetails = () => {
       {/* Top Banner / Header */}
       <header className="sticky top-0 z-10 bg-[#fbf9f6]/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <h1 className="font-serif text-xl tracking-wide uppercase">{product.title?.substring(0, 20)}{product.title?.length > 20 ? '...' : ''}</h1>
+        <button
+          onClick={handleDeleteProductClick}
+          className="flex items-center gap-2 bg-[#ba1a1a] text-white px-4 py-2 uppercase tracking-wider text-sm hover:bg-[#8b0000] transition-colors cursor-pointer"
+        >
+          <TrashIcon /> Delete Product
+        </button>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 mt-8">
@@ -401,13 +458,20 @@ const SellerProductDetails = () => {
                   {/* Stock Management Row */}
                   <div className="mt-auto border-t border-[#f5f3f0] bg-[#fbf9f6] flex items-center px-6 py-3 justify-between">
                     <label className="text-sm text-[#6e6258] uppercase tracking-wider">Current Stock</label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <input
                         type="number"
                         value={variant.stock || 0}
                         onChange={(e) => handleStockChange(idx, e.target.value)}
                         className="w-20 bg-transparent border-b border-[#d0c5b5] py-1 text-right focus:outline-none focus:border-[#745a27] font-serif text-lg"
                       />
+                      <button
+                        onClick={() => handleDeleteVariant(variant._id)}
+                        className="text-[#ba1a1a] p-2 hover:bg-[#ffdad6] transition-colors cursor-pointer ml-auto"
+                        title="Delete variant"
+                      >
+                        <TrashIcon />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -418,6 +482,47 @@ const SellerProductDetails = () => {
         </section>
 
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#fbf9f6] max-w-sm w-full p-8 shadow-2xl" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <h2 className="font-serif text-2xl mb-4 uppercase tracking-wide" style={{ color: '#1b1c1a' }}>
+              {deleteConfirmation.type === 'product' ? 'Delete Product' : 'Delete Variant'}
+            </h2>
+            
+            <p className="text-[#6e6258] mb-8 leading-relaxed">
+              {deleteConfirmation.type === 'product'
+                ? 'This will permanently delete this product and all its variants. This action cannot be undone.'
+                : 'This will permanently delete this variant. This action cannot be undone.'}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDelete}
+                disabled={deleteConfirmation.isDeleting}
+                className="flex-1 px-6 py-3 border border-[#d0c5b5] text-[#1b1c1a] uppercase tracking-wider text-xs hover:border-[#1b1c1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteConfirmation.isDeleting}
+                className="flex-1 px-6 py-3 bg-[#ba1a1a] text-white uppercase tracking-wider text-xs hover:bg-[#8b0000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {deleteConfirmation.isDeleting ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
