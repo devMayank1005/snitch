@@ -18,6 +18,8 @@ const SellerProductDetails = () => {
   const [ localVariants, setLocalVariants ] = useState([]);
   const [ isAddingVariant, setIsAddingVariant ] = useState(false);
   const [ loading, setLoading ] = useState(true);
+  const [ baseStock, setBaseStock ] = useState(0);
+  const [ isSavingBaseStock, setIsSavingBaseStock ] = useState(false);
 
   // Delete confirmation modal state
   const [ deleteConfirmation, setDeleteConfirmation ] = useState({
@@ -40,7 +42,7 @@ const SellerProductDetails = () => {
 
   const { productId } = useParams();
   const navigate = useNavigate();
-  const { handleGetProductById, handleAddProductVariant, handleDeleteProductVariant, handleDeleteProduct } = useProduct();
+  const { handleGetProductById, handleAddProductVariant, handleDeleteProductVariant, handleDeleteProduct, handleUpdateProduct } = useProduct();
 
   async function fetchProductDetails() {
     setLoading(true);
@@ -48,6 +50,7 @@ const SellerProductDetails = () => {
       const data = await handleGetProductById(productId);
       const prod = data?.product || data;
       setProduct(prod);
+      setBaseStock(Number(prod?.stock) || 0);
       // Initialize variants locally
       if (prod?.variants) {
         setLocalVariants(prod.variants);
@@ -202,6 +205,23 @@ const SellerProductDetails = () => {
     });
   };
 
+  const handleSaveBaseStock = async () => {
+    try {
+      setIsSavingBaseStock(true);
+      const parsedStock = Math.max(0, Number(baseStock) || 0);
+      const updatedProduct = await handleUpdateProduct(productId, { stock: parsedStock });
+      setProduct(prev => ({ ...prev, stock: Number(updatedProduct?.stock) || parsedStock }));
+      setBaseStock(Number(updatedProduct?.stock) || parsedStock);
+      alert('Base stock updated successfully.');
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to update base stock.';
+      alert(message);
+      console.error('Failed to update base stock:', error);
+    } finally {
+      setIsSavingBaseStock(false);
+    }
+  };
+
   const confirmDelete = async () => {
     setDeleteConfirmation(prev => ({ ...prev, isDeleting: true }));
 
@@ -275,6 +295,28 @@ const SellerProductDetails = () => {
             <p className="text-[#6e6258] text-lg mb-6 leading-relaxed max-w-md">{product.description}</p>
             <div className="text-2xl tracking-wide font-light mb-8">
               {product.price?.amount} {product.price?.currency}
+            </div>
+
+            <div className="max-w-xs">
+              <label className="block text-sm uppercase tracking-wider text-[#6e6258] mb-2">Base Product Stock</label>
+              <div className="flex items-end gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={baseStock}
+                  onChange={(e) => setBaseStock(e.target.value)}
+                  className="w-28 bg-transparent border-b border-[#d0c5b5] py-2 text-right focus:outline-none focus:border-[#745a27] font-serif text-lg"
+                />
+                <button
+                  onClick={handleSaveBaseStock}
+                  disabled={isSavingBaseStock}
+                  className="bg-[#745a27] text-[#ffffff] px-4 py-2 uppercase tracking-wider text-xs hover:bg-[#5a4312] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSavingBaseStock ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              <p className="text-xs text-[#7f7668] mt-2">Use base stock for non-variant purchases.</p>
             </div>
           </div>
         </section>

@@ -7,6 +7,7 @@ import {
     getProductDetails,
     addProductVariant,
     updateProductVariant,
+    updateProduct,
     deleteProductVariant,
     deleteProduct,
 } from "../controllers/product.controller.js"
@@ -28,6 +29,7 @@ router.post("/create", requireAuth, requireRole("seller"), upload.array('images'
 router.post("/:productId/variants", requireAuth, requireRole("seller"), upload.array('images', 7), addProductVariant);
 router.patch("/:productId/variants/:variantId", requireAuth, requireRole("seller"), upload.array('images', 7), updateProductVariant);
 router.delete("/:productId/variants/:variantId", requireAuth, requireRole("seller"), deleteProductVariant);
+router.patch("/:productId", requireAuth, requireRole("seller"), updateProduct);
 
 router.get("/seller", requireAuth, requireRole("seller"), getSellerProducts);
 

@@ -185,6 +185,17 @@ export async function addToCart(req, res) {
       return res.status(404).json({ success: false, message: "Product no longer exists." });
     }
 
+    const hasActiveVariants = Array.isArray(liveProduct.variants)
+      && liveProduct.variants.some((entry) => entry?.isActive !== false);
+    const baseStock = Number(liveProduct.stock) || 0;
+
+    if (!variantId && hasActiveVariants && baseStock <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an available variation before adding this item to cart.",
+      });
+    }
+
     const liveSelection = resolveLiveSelection(liveProduct, variantId);
     if (!liveSelection) {
       return res.status(404).json({ success: false, message: "Variant no longer exists." });

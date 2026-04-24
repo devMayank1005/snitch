@@ -167,6 +167,32 @@ const getAvailableAttributeValues = (variants = [], axisKey, selectedAttributes 
     return availableValues;
 };
 
+const getStockForAttributeValue = (variants = [], axisKey, value, selectedAttributes = {}) => {
+    const normalizedAxisKey = normalizeAttributeKey(axisKey);
+
+    return variants.reduce((total, variant) => {
+        if (variant?.isActive === false) return total;
+
+        const variantStock = Number(variant?.stock) || 0;
+        if (variantStock <= 0) return total;
+
+        const variantAttributes = toPlainAttributes(variant?.attributes || {});
+        const normalizedVariantAttrs = Object.fromEntries(
+            Object.entries(variantAttributes).map(([key, attrValue]) => [normalizeAttributeKey(key), attrValue])
+        );
+
+        if (String(normalizedVariantAttrs[normalizedAxisKey]) !== String(value)) {
+            return total;
+        }
+
+        const matchesOtherSelectedAttributes = Object.entries(selectedAttributes)
+            .filter(([key, selectedValue]) => key !== normalizedAxisKey && selectedValue)
+            .every(([key, selectedValue]) => String(normalizedVariantAttrs[normalizeAttributeKey(key)]) === String(selectedValue));
+
+        return matchesOtherSelectedAttributes ? total + variantStock : total;
+    }, 0);
+};
+
 const ProductDetail = () => {
     const { productId } = useParams();
     const navigate = useNavigate();
@@ -193,6 +219,12 @@ const ProductDetail = () => {
     const [displayImages, setDisplayImages] = useState([]);
 
     const normalizedVariants = normalizeProductVariants(product?.variants || [], product?.variationStructure || []);
+    const hasVariants = normalizedVariants.length > 0;
+    const baseStock = Number(product?.stock) || 0;
+    const hasBaseOption = baseStock > 0;
+    const activeStock = activeVariant ? Number(activeVariant.stock) || 0 : baseStock;
+    const requiresVariantSelection = hasVariants && !selectedVariantId && !hasBaseOption;
+    const canAddToCart = activeStock > 0 && !requiresVariantSelection;
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -293,6 +325,16 @@ const ProductDetail = () => {
             return false;
         }
 
+        if (requiresVariantSelection) {
+            alert('Please select an available variation before adding this product to cart.');
+            return false;
+        }
+
+        if (activeStock <= 0) {
+            alert('This selection is currently out of stock.');
+            return false;
+        }
+
         try {
             await handleAddToCart({ 
                 productId: product._id,
@@ -305,7 +347,8 @@ const ProductDetail = () => {
             return true;
         } catch (error) {
             console.error('❌ Add to cart error:', error);
-            alert("Failed to add to cart.");
+            const serverMessage = error?.response?.data?.message;
+            alert(serverMessage || 'Failed to add to cart.');
             return false;
         }
     };
@@ -471,18 +514,20 @@ const ProductDetail = () => {
                             {normalizedVariants.length > 0 && (
                                 <div className="mb-10">
                                     <span className="text-[10px] uppercase tracking-[0.2em] font-medium block mb-4" style={{ color: '#B5ADA3' }}>Select Variation</span>
-                                    <div className="flex flex-wrap gap-3 mb-5">
-                                        <button
-                                            onClick={handleSelectBaseProduct}
-                                            className={`px-6 py-3 border transition-colors ${
-                                                selectedVariantId === null
-                                                    ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
-                                                    : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
-                                            }`}
-                                        >
-                                            <span className="text-[10px] uppercase tracking-widest block">Original</span>
-                                        </button>
-                                    </div>
+                                    {hasBaseOption && (
+                                        <div className="flex flex-wrap gap-3 mb-5">
+                                            <button
+                                                onClick={handleSelectBaseProduct}
+                                                className={`px-6 py-3 border transition-colors ${
+                                                    selectedVariantId === null
+                                                        ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
+                                                        : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
+                                                }`}
+                                            >
+                                                <span className="text-[10px] uppercase tracking-widest block">Original</span>
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {getVariantAttributeAxes(normalizedVariants, product.variationStructure || []).map((axis) => {
                                         const availableValues = getAvailableAttributeValues(normalizedVariants, axis.key, selectedAttributes);
@@ -496,6 +541,17 @@ const ProductDetail = () => {
                                                         const isSelected = String(selectedAttributes[axis.key] || '') === String(value);
                                                         const isAvailable = availableValues.has(value);
                                                         const isDisabled = !isAvailable;
+                                                        const valueStock = getStockForAttributeValue(normalizedVariants, axis.key, value, selectedAttributes);
+                                                        const stockLabel = valueStock <= 0
+                                                            ? 'Out of stock'
+                                                            : valueStock <= 3
+                                                            ? `Only ${valueStock} left`
+                                                            : `${valueStock} in stock`;
+                                                        const mobileStockLabel = valueStock <= 0
+                                                            ? 'Out of stock'
+                                                            : isSelected
+                                                            ? stockLabel
+                                                            : 'In stock';
 
                                                         return (
                                                             <button
@@ -511,6 +567,12 @@ const ProductDetail = () => {
                                                                 }`}
                                                             >
                                                                 <span className="text-[10px] uppercase tracking-widest block">{value}</span>
+                                                                <span className={`mt-1 block text-[9px] normal-case tracking-normal md:hidden ${isSelected ? 'text-[#e6dfd5]' : valueStock <= 0 ? 'text-[#b5b5b5]' : valueStock <= 3 ? 'text-[#C9A96E]' : 'text-[#7A6E63]'}`}>
+                                                                    {mobileStockLabel}
+                                                                </span>
+                                                                <span className={`mt-1 hidden text-[9px] normal-case tracking-normal md:block ${isSelected ? 'text-[#e6dfd5]' : valueStock <= 0 ? 'text-[#b5b5b5]' : valueStock <= 3 ? 'text-[#C9A96E]' : 'text-[#7A6E63]'}`}>
+                                                                    {stockLabel}
+                                                                </span>
                                                             </button>
                                                         );
                                                     })}
@@ -526,19 +588,22 @@ const ProductDetail = () => {
                                 <div className="flex gap-4">
                                     <button
                                         onClick={addToCart}
+                                        disabled={!canAddToCart}
                                         className="flex-1 py-5 text-[11px] uppercase tracking-[0.3em] font-medium border transition-all duration-300"
                                         style={{
-                                            borderColor: '#1b1c1a',
-                                            color: '#1b1c1a',
-                                            backgroundColor: 'transparent'
+                                            borderColor: canAddToCart ? '#1b1c1a' : '#d0c5b5',
+                                            color: canAddToCart ? '#1b1c1a' : '#b5b5b5',
+                                            backgroundColor: 'transparent',
+                                            cursor: canAddToCart ? 'pointer' : 'not-allowed'
                                         }}
                                         onMouseEnter={e => {
+                                            if (!canAddToCart) return;
                                             e.currentTarget.style.backgroundColor = '#1b1c1a';
                                             e.currentTarget.style.color = '#fbf9f6';
                                         }}
                                         onMouseLeave={e => {
                                             e.currentTarget.style.backgroundColor = 'transparent';
-                                            e.currentTarget.style.color = '#1b1c1a';
+                                            e.currentTarget.style.color = canAddToCart ? '#1b1c1a' : '#b5b5b5';
                                         }}
                                     >
                                         Add to Cart
@@ -546,23 +611,31 @@ const ProductDetail = () => {
 
                                     <button
                                         onClick={buyNow}
+                                        disabled={!canAddToCart}
                                         className="flex-1 py-5 text-[11px] uppercase tracking-[0.3em] font-medium transition-all duration-300"
                                         style={{
-                                            backgroundColor: '#1b1c1a',
-                                            color: '#fbf9f6',
+                                            backgroundColor: canAddToCart ? '#1b1c1a' : '#d0c5b5',
+                                            color: canAddToCart ? '#fbf9f6' : '#fbf9f6',
+                                            cursor: canAddToCart ? 'pointer' : 'not-allowed',
                                         }}
                                         onMouseEnter={e => {
+                                            if (!canAddToCart) return;
                                             e.currentTarget.style.backgroundColor = '#C9A96E';
                                             e.currentTarget.style.color = '#1b1c1a';
                                         }}
                                         onMouseLeave={e => {
-                                            e.currentTarget.style.backgroundColor = '#1b1c1a';
+                                            e.currentTarget.style.backgroundColor = canAddToCart ? '#1b1c1a' : '#d0c5b5';
                                             e.currentTarget.style.color = '#fbf9f6';
                                         }}
                                     >
                                         Buy Now
                                     </button>
                                 </div>
+                                {!canAddToCart && (
+                                    <p className="text-center mt-2 text-[10px] uppercase tracking-[0.1em]" style={{ color: '#B5ADA3' }}>
+                                        {requiresVariantSelection ? 'Select an available variation to continue' : 'Selected option is out of stock'}
+                                    </p>
+                                )}
                                 <p className="text-center mt-4 text-[10px] uppercase tracking-[0.1em]" style={{ color: '#B5ADA3' }}>
                                     Complimentary shipping & returns on all curated pieces
                                 </p>

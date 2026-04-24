@@ -140,7 +140,7 @@ function uniqueVariantsByCombinationKey(variants = [], variationStructure = []) 
 
 export async function createProduct(req, res) {
   try {
-    const { title, description, priceAmount, priceCurrency, category, variationStructure } = req.body;
+    const { title, description, priceAmount, priceCurrency, category, stock, variationStructure } = req.body;
     const sellerId = req.user.userId;
 
     const images = await uploadImages(req.files || []);
@@ -154,6 +154,7 @@ export async function createProduct(req, res) {
         currency: priceCurrency || "INR",
       },
       category,
+      stock: Math.max(0, Number(stock) || 0),
       seller: sellerId,
       images,
       variationStructure: parsedVariationStructure,
@@ -418,6 +419,41 @@ export async function deleteProductVariant(req, res) {
     return res.status(200).json({ success: true, message: "Variant deleted" });
   } catch (error) {
     console.error("Error in deleteProductVariant:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
+
+export async function updateProduct(req, res) {
+  try {
+    const { productId } = req.params;
+    const sellerId = req.user.userId || req.user.id;
+    const { stock } = req.body;
+
+    const product = await Product.findOne({ _id: productId, seller: sellerId });
+    if (!product) {
+      return res.status(404).json({
+        message: "Product not found or unauthorized",
+        success: false,
+      });
+    }
+
+    if (stock !== undefined) {
+      const parsedStock = Number(stock);
+      if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ success: false, message: "Invalid stock value" });
+      }
+      product.stock = Math.floor(parsedStock);
+    }
+
+    await product.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      product,
+    });
+  } catch (error) {
+    console.error("Error in updateProduct:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }

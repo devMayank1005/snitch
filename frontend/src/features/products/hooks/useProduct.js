@@ -6,6 +6,7 @@ import {
     addProductVariant,
     updateProductVariant,
     deleteProductVariant,
+    updateProduct,
     deleteProduct,
 } from "../services/product.api.js"
 import { useDispatch } from "react-redux"
@@ -53,6 +54,11 @@ export const useProduct = () => {
         return deleteProductVariant(productId, variantId)
     }
 
+    async function handleUpdateProduct(productId, payload) {
+        const data = await updateProduct(productId, payload)
+        return data.product || data.data || data
+    }
+
     async function handleDeleteProduct(productId) {
         return deleteProduct(productId)
     }
@@ -65,6 +71,7 @@ export const useProduct = () => {
         handleAddProductVariant,
         handleUpdateProductVariant,
         handleDeleteProductVariant,
+        handleUpdateProduct,
         handleDeleteProduct,
     }
 

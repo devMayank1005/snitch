@@ -86,6 +86,11 @@ export async function deleteProductVariant(productId, variantId) {
     return response.data;
 }
 
+export async function updateProduct(productId, payload) {
+    const response = await productApiInstance.patch(`/${productId}`, payload);
+    return response.data;
+}
+
 export async function deleteProduct(productId) {
     const response = await productApiInstance.delete(`/${productId}`);
     return response.data;

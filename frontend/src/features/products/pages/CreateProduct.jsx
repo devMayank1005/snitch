@@ -15,6 +15,7 @@ const CreateProduct = () => {
         priceAmount: '',
         priceCurrency: 'INR',
         category: '',
+        stock: '1',
     });
     const [images, setImages] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -67,6 +68,7 @@ const CreateProduct = () => {
             data.append('category', formData.category);
             data.append('priceAmount', formData.priceAmount);
             data.append('priceCurrency', formData.priceCurrency);
+            data.append('stock', formData.stock);
             images.forEach(img => data.append('images', img.file));
             await handleCreateProduct(data);
             navigate('/');
@@ -250,6 +252,32 @@ const CreateProduct = () => {
                                             </select>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Base Stock */}
+                                <div className="flex flex-col gap-2">
+                                    <label
+                                        htmlFor="cp-stock"
+                                        className="text-[10px] uppercase tracking-[0.2em] font-medium"
+                                        style={{ color: '#7A6E63' }}
+                                    >
+                                        Stock
+                                    </label>
+                                    <input
+                                        id="cp-stock"
+                                        type="number"
+                                        name="stock"
+                                        value={formData.stock}
+                                        onChange={handleChange}
+                                        required
+                                        min="0"
+                                        step="1"
+                                        placeholder="e.g. 12"
+                                        className={inputClass}
+                                        style={inputStyle}
+                                        onFocus={handleFocus}
+                                        onBlur={handleBlur}
+                                    />
                                 </div>
                             </div>
 
