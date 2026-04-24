@@ -10,6 +10,126 @@ const HeartIcon = ({ filled }) => (
     </svg>
 );
 
+const toPlainAttributes = (attributes = {}) => Object.fromEntries(
+    Object.entries(attributes).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+);
+
+const normalizeAttributeKey = (key) => String(key || '').trim().toLowerCase();
+const SIZE_VALUES = new Set(['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl']);
+
+const labelAttributeKey = (key) => {
+    const normalized = String(key || '').trim();
+    if (!normalized) return '';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+};
+
+const sanitizeVariantAttributes = (attributes = {}, variationStructure = []) => {
+    const plain = toPlainAttributes(attributes);
+    const normalized = {};
+
+    Object.entries(plain).forEach(([key, value]) => {
+        const normalizedKey = normalizeAttributeKey(key);
+        if (!normalizedKey) return;
+        normalized[normalizedKey] = String(value).trim();
+    });
+
+    const entries = Object.entries(normalized);
+    if (entries.length === 1) {
+        const [singleKey, singleValue] = entries[0];
+        const keyIsSizeValue = SIZE_VALUES.has(singleKey);
+        const valueNormalized = normalizeAttributeKey(singleValue);
+        const valueIsSizeValue = SIZE_VALUES.has(valueNormalized);
+
+        // Legacy malformed shape: { L: "Blue" } or { Blue: "L" }
+        if (keyIsSizeValue && !valueIsSizeValue) {
+            return { size: singleKey.toUpperCase(), color: singleValue };
+        }
+        if (!keyIsSizeValue && valueIsSizeValue) {
+            return { color: labelAttributeKey(singleKey), size: valueNormalized.toUpperCase() };
+        }
+    }
+
+    if (Array.isArray(variationStructure) && variationStructure.length > 0) {
+        const structureKeys = variationStructure.map((key) => normalizeAttributeKey(key)).filter(Boolean);
+        const ordered = {};
+
+        structureKeys.forEach((key) => {
+            if (normalized[key] !== undefined) {
+                ordered[key] = normalized[key];
+            }
+        });
+
+        Object.entries(normalized).forEach(([key, value]) => {
+            if (ordered[key] === undefined) {
+                ordered[key] = value;
+            }
+        });
+
+        return ordered;
+    }
+
+    return normalized;
+};
+
+const normalizeProductVariants = (variants = [], variationStructure = []) => (
+    variants.map((variant) => ({
+        ...variant,
+        attributes: sanitizeVariantAttributes(variant?.attributes || {}, variationStructure),
+    }))
+);
+
+const getVariantAttributeAxes = (variants = [], variationStructure = []) => {
+    const axisOrder = Array.isArray(variationStructure) ? variationStructure.filter(Boolean) : [];
+    const axisMap = new Map();
+
+    variants.forEach((variant) => {
+        Object.entries(variant?.attributes || {}).forEach(([key, value]) => {
+            const normalizedKey = normalizeAttributeKey(key);
+            if (!normalizedKey) return;
+
+            if (!axisMap.has(normalizedKey)) {
+                axisMap.set(normalizedKey, { label: labelAttributeKey(key), values: [] });
+            }
+
+            const currentAxis = axisMap.get(normalizedKey);
+            const normalizedValue = String(value);
+            if (!currentAxis.values.includes(normalizedValue)) {
+                currentAxis.values.push(normalizedValue);
+            }
+        });
+    });
+
+    const orderedKeys = axisOrder.length > 0
+        ? axisOrder.map((key) => normalizeAttributeKey(key))
+        : Array.from(axisMap.keys());
+
+    return orderedKeys
+        .filter((key, index, array) => key && array.indexOf(key) === index)
+        .map((key) => ({
+            key,
+            label: axisMap.get(key)?.label || labelAttributeKey(key),
+            values: axisMap.get(key)?.values || [],
+        }));
+};
+
+const isExactVariantMatch = (variant, selectedAttributes = {}) => {
+    const variantAttributes = toPlainAttributes(variant?.attributes || {});
+    const selectedNormalized = Object.fromEntries(
+        Object.entries(selectedAttributes).map(([key, value]) => [normalizeAttributeKey(key), value])
+    );
+    const selectedKeys = Object.keys(selectedNormalized).filter((key) => selectedNormalized[key]);
+
+    if (selectedKeys.length === 0) return false;
+
+    const normalizedVariantAttributes = Object.fromEntries(
+        Object.entries(variantAttributes).map(([key, value]) => [normalizeAttributeKey(key), value])
+    );
+
+    if (Object.keys(normalizedVariantAttributes).length !== selectedKeys.length) return false;
+
+    return selectedKeys.every((key) => String(normalizedVariantAttributes[key]) === String(selectedNormalized[key]));
+};
+
 const ProductDetail = () => {
     const { productId } = useParams();
     const navigate = useNavigate();
@@ -22,19 +142,25 @@ const ProductDetail = () => {
     // We will just do functional triggers for simplicity.
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [reloadKey, setReloadKey] = useState(0);
     
     // Variant Tracking
     const [activeImage, setActiveImage] = useState(0);
     const [selectedVariantId, setSelectedVariantId] = useState(null);
     const [activeVariant, setActiveVariant] = useState(null);
+    const [selectedAttributes, setSelectedAttributes] = useState({});
 
     // Dynamic Display State
     const [displayPrice, setDisplayPrice] = useState(null);
     const [displayImages, setDisplayImages] = useState([]);
 
+    const normalizedVariants = normalizeProductVariants(product?.variants || [], product?.variationStructure || []);
+
     useEffect(() => {
         const fetchProduct = async () => {
             setLoading(true);
+            setErrorMessage('');
             try {
                 const data = await handleGetProductById(productId);
                 const prod = data?.product || data;
@@ -43,25 +169,28 @@ const ProductDetail = () => {
                 // Initialize Base UI State
                 setDisplayPrice(prod.price);
                 setDisplayImages(prod.images || []);
-                
-                // Select first variant if exists
-                if (prod.variants && prod.variants.length > 0) {
-                    const defaultVariant = prod.variants[0];
-                    setSelectedVariantId(defaultVariant._id);
-                    setActiveVariant(defaultVariant);
-                    
-                    if (defaultVariant.price?.amount) setDisplayPrice(defaultVariant.price);
-                    if (defaultVariant.images?.length > 0) setDisplayImages(defaultVariant.images);
-                }
+                setSelectedVariantId(null);
+                setActiveVariant(null);
+                setSelectedAttributes({});
+                setActiveImage(0);
 
             } catch (error) {
                 console.error("Failed to fetch product", error);
+                setProduct(null);
+
+                if (error?.response?.status === 502) {
+                    setErrorMessage('Product service is temporarily unavailable. Please try again in a moment.');
+                } else if (error?.response?.status === 404) {
+                    setErrorMessage('This product was not found.');
+                } else {
+                    setErrorMessage(error?.response?.data?.message || 'Failed to fetch product. Please retry.');
+                }
             } finally {
                 setLoading(false);
             }
         };
         fetchProduct();
-    }, [productId]);
+    }, [productId, reloadKey]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -79,6 +208,11 @@ const ProductDetail = () => {
     const handleSelectVariant = (variant) => {
         setSelectedVariantId(variant._id);
         setActiveVariant(variant);
+        setSelectedAttributes(
+            Object.fromEntries(
+                Object.entries(variant?.attributes || {}).map(([key, value]) => [normalizeAttributeKey(key), String(value)])
+            )
+        );
         setActiveImage(0); // reset viewer
 
         if (variant.price?.amount) setDisplayPrice(variant.price);
@@ -86,6 +220,34 @@ const ProductDetail = () => {
 
         if (variant.images?.length > 0) setDisplayImages(variant.images);
         else setDisplayImages(product.images);
+    };
+
+    const handleSelectAttributeValue = (axisKey, value) => {
+        const normalizedAxisKey = normalizeAttributeKey(axisKey);
+        const nextAttributes = { ...selectedAttributes, [normalizedAxisKey]: value };
+        setSelectedAttributes(nextAttributes);
+
+        const matchedVariant = normalizedVariants.find((variant) => isExactVariantMatch(variant, nextAttributes));
+
+        if (matchedVariant) {
+            handleSelectVariant(matchedVariant);
+            return;
+        }
+
+        setSelectedVariantId(null);
+        setActiveVariant(null);
+        setActiveImage(0);
+        setDisplayPrice(product.price);
+        setDisplayImages(product.images || []);
+    };
+
+    const handleSelectBaseProduct = () => {
+        setSelectedVariantId(null);
+        setActiveVariant(null);
+        setSelectedAttributes({});
+        setActiveImage(0);
+        setDisplayPrice(product.price);
+        setDisplayImages(product.images || []);
     };
 
     const addToCart = async ({ redirectToCart = true } = {}) => {
@@ -143,8 +305,18 @@ const ProductDetail = () => {
     if (!product) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ backgroundColor: '#fbf9f6' }}>
-                <h2 className="text-2xl" style={{ fontFamily: "'Cormorant Garamond', serif", color: '#1b1c1a' }}>Piece not found.</h2>
-                <button onClick={() => navigate('/')} className="text-[#C9A96E] uppercase tracking-[0.2em] text-xs underline underline-offset-4">Return Home</button>
+                <h2 className="text-2xl" style={{ fontFamily: "'Cormorant Garamond', serif", color: '#1b1c1a' }}>
+                    {errorMessage || 'Piece not found.'}
+                </h2>
+                <div className="flex items-center gap-5">
+                    <button
+                        onClick={() => setReloadKey((prev) => prev + 1)}
+                        className="text-[#1b1c1a] uppercase tracking-[0.2em] text-xs underline underline-offset-4"
+                    >
+                        Retry
+                    </button>
+                    <button onClick={() => navigate('/')} className="text-[#C9A96E] uppercase tracking-[0.2em] text-xs underline underline-offset-4">Return Home</button>
+                </div>
             </div>
         );
     }
@@ -259,40 +431,47 @@ const ProductDetail = () => {
                             </div>
 
                             {/* Options / Variants Selector */}
-                            {product.variants && product.variants.length > 0 && (
+                            {normalizedVariants.length > 0 && (
                                 <div className="mb-10">
                                     <span className="text-[10px] uppercase tracking-[0.2em] font-medium block mb-4" style={{ color: '#B5ADA3' }}>Select Variation</span>
-                                    <div className="flex flex-wrap gap-3">
-                                        {product.variants.map((v) => {
-                                            const isSelected = selectedVariantId === v._id;
-                                            
-                                            // Make human readable tag from attributes
-                                            let tag = "Variant";
-                                            if (v.attributes && Object.keys(v.attributes).length > 0) {
-                                                tag = Object.values(v.attributes).join(' | ');
-                                            }
-
-                                            const outOfStock = v.stock === 0;
-
-                                            return (
-                                                <button
-                                                    key={v._id}
-                                                    onClick={() => !outOfStock && handleSelectVariant(v)}
-                                                    disabled={outOfStock}
-                                                    className={`px-6 py-3 border transition-colors ${
-                                                        outOfStock 
-                                                         ? 'opacity-30 cursor-not-allowed border-[#d0c5b5] text-[#b0a79a]' 
-                                                         : isSelected 
-                                                            ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
-                                                            : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
-                                                    }`}
-                                                >
-                                                    <span className="text-[10px] uppercase tracking-widest block">{tag}</span>
-                                                    {outOfStock && <span className="text-[8px] block mt-1">Sold Out</span>}
-                                                </button>
-                                            )
-                                        })}
+                                    <div className="flex flex-wrap gap-3 mb-5">
+                                        <button
+                                            onClick={handleSelectBaseProduct}
+                                            className={`px-6 py-3 border transition-colors ${
+                                                selectedVariantId === null
+                                                    ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
+                                                    : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
+                                            }`}
+                                        >
+                                            <span className="text-[10px] uppercase tracking-widest block">Original</span>
+                                        </button>
                                     </div>
+
+                                    {getVariantAttributeAxes(normalizedVariants, product.variationStructure || []).map((axis) => (
+                                        <div key={axis.key} className="mb-5">
+                                            <span className="text-[10px] uppercase tracking-[0.2em] font-medium block mb-3" style={{ color: '#B5ADA3' }}>
+                                                {axis.label}
+                                            </span>
+                                            <div className="flex flex-wrap gap-3">
+                                                {axis.values.map((value) => {
+                                                    const isSelected = String(selectedAttributes[axis.key] || '') === String(value);
+                                                    return (
+                                                        <button
+                                                            key={`${axis.key}:${value}`}
+                                                            onClick={() => handleSelectAttributeValue(axis.key, value)}
+                                                            className={`px-6 py-3 border transition-colors ${
+                                                                isSelected
+                                                                    ? 'border-[#1b1c1a] bg-[#1b1c1a] text-[#fbf9f6]'
+                                                                    : 'border-[#d0c5b5] text-[#1b1c1a] hover:border-[#1b1c1a]'
+                                                            }`}
+                                                        >
+                                                            <span className="text-[10px] uppercase tracking-widest block">{value}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 

@@ -122,6 +122,22 @@ function getVariantSummary(variants = []) {
     .join(" | ");
 }
 
+function uniqueVariantsByCombinationKey(variants = [], variationStructure = []) {
+  const seen = new Set();
+  const unique = [];
+
+  for (const variant of variants) {
+    const key = hydrateVariantCombinationKey(variant, variationStructure);
+    const dedupeKey = key || variant?._id?.toString() || "";
+    if (!dedupeKey || seen.has(dedupeKey)) continue;
+
+    seen.add(dedupeKey);
+    unique.push(variant);
+  }
+
+  return unique;
+}
+
 export async function createProduct(req, res) {
   try {
     const { title, description, priceAmount, priceCurrency, category, variationStructure } = req.body;
@@ -163,7 +179,8 @@ export async function getSellerProducts(req, res) {
 
     const enriched = products.map((product) => ({
       ...product,
-      variantSummary: getVariantSummary(product.variants || []),
+      variants: uniqueVariantsByCombinationKey(product.variants || [], product.variationStructure || []),
+      variantSummary: getVariantSummary(uniqueVariantsByCombinationKey(product.variants || [], product.variationStructure || [])),
     }));
 
     return res.status(200).json({
@@ -206,6 +223,8 @@ export async function getProductDetails(req, res) {
     if (!product) {
       return res.status(404).json({ message: "Product not found", success: false });
     }
+
+    product.variants = uniqueVariantsByCombinationKey(product.variants || [], product.variationStructure || []);
 
     return res.status(200).json({
       message: "Product details fetched successfully",
@@ -251,7 +270,8 @@ export async function addProductVariant(req, res) {
         message: "Variant attributes must produce a valid combination key.",
       });
     }
-    const exists = (product.variants || []).some((variant) => variant.combinationKey === combinationKey);
+    const normalizedVariants = uniqueVariantsByCombinationKey(product.variants || [], product.variationStructure || []);
+    const exists = normalizedVariants.some((variant) => variant.combinationKey === combinationKey);
     if (exists) {
       return res.status(400).json({
         message: "A variant with this exact combination already exists.",
@@ -264,6 +284,7 @@ export async function addProductVariant(req, res) {
     const amount = Number(req.body.priceAmount);
     const hasPriceOverride = Number.isFinite(amount) && amount >= 0;
 
+    product.variants = normalizedVariants;
     product.variants.push({
       sku: req.body.sku?.trim(),
       attributes,
@@ -313,6 +334,9 @@ export async function updateProductVariant(req, res) {
     if (!variant) {
       return res.status(404).json({ success: false, message: "Variant not found" });
     }
+
+    const normalizedVariants = uniqueVariantsByCombinationKey(product.variants || [], product.variationStructure || []);
+    product.variants = normalizedVariants;
 
     const stockRaw = req.body.stock;
     if (stockRaw !== undefined) {

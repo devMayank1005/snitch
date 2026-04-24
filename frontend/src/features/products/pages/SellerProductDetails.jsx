@@ -6,6 +6,13 @@ import { useParams } from 'react-router';
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
 
+const normalizeAttributeKey = (key) => String(key || '').trim().toLowerCase();
+const labelAttributeKey = (key) => {
+  const normalized = String(key || '').trim();
+  if (!normalized) return '';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+};
+
 const SellerProductDetails = () => {
   const [ product, setProduct ] = useState(null);
   const [ localVariants, setLocalVariants ] = useState([]);
@@ -111,8 +118,9 @@ const SellerProductDetails = () => {
     // Synchronize to object format
     const newAttrsObj = {};
     updatedInputs.forEach(attr => {
-      if (attr.key.trim() !== '') {
-        newAttrsObj[ attr.key.trim() ] = attr.value;
+      const normalizedKey = normalizeAttributeKey(attr.key);
+      if (normalizedKey !== '') {
+        newAttrsObj[ normalizedKey ] = attr.value;
       }
     });
     setNewVariant(prev => ({ ...prev, attributes: newAttrsObj }));
@@ -125,8 +133,9 @@ const SellerProductDetails = () => {
     // Synchronize to object format
     const newAttrsObj = {};
     updatedInputs.forEach(attr => {
-      if (attr.key.trim() !== '') {
-        newAttrsObj[ attr.key.trim() ] = attr.value;
+      const normalizedKey = normalizeAttributeKey(attr.key);
+      if (normalizedKey !== '') {
+        newAttrsObj[ normalizedKey ] = attr.value;
       }
     });
     setNewVariant(prev => ({ ...prev, attributes: newAttrsObj }));
@@ -379,7 +388,7 @@ const SellerProductDetails = () => {
                       <div className="flex flex-wrap gap-2 mb-2">
                         {Object.entries(variant.attributes || {}).map(([ key, val ]) => (
                           <span key={key} className="bg-[#f5f3f0] px-2 py-1 text-xs uppercase tracking-wider text-[#4d463a]">
-                            <span className="text-[#a8a094]">{key}:</span> {val}
+                            <span className="text-[#a8a094]">{labelAttributeKey(key)}:</span> {val}
                           </span>
                         ))}
                       </div>
