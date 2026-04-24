@@ -1,4 +1,5 @@
 import { UserModel } from "../models/user.model.js";
+import { CartModel } from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 
 function buildItemKey(productId, variantId) {
@@ -47,7 +48,7 @@ function resolveLiveSelection(product, variantId) {
 }
 
 async function repairCartSnapshots(user) {
-  const productIds = user.cart.map((item) => item.product).filter(Boolean);
+  const productIds = user.items.map((item) => item.product).filter(Boolean);
   if (!productIds.length) return false;
 
   const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
@@ -58,38 +59,38 @@ async function repairCartSnapshots(user) {
 
   let repaired = false;
 
-  for (let i = user.cart.length - 1; i >= 0; i--) {
-    const item = user.cart[i];
+  for (let i = user.items.length - 1; i >= 0; i--) {
+    const item = user.items[i];
     const liveProduct = productMap[item.product.toString()];
 
     if (!liveProduct) {
-      user.cart.splice(i, 1);
+      user.items.splice(i, 1);
       repaired = true;
       continue;
     }
 
     const liveSelection = resolveLiveSelection(liveProduct, item.variantId);
     if (!liveSelection) {
-      user.cart.splice(i, 1);
+      user.items.splice(i, 1);
       repaired = true;
       continue;
     }
 
     const nextItemKey = buildItemKey(item.product.toString(), item.variantId?.toString());
     if (!item.itemKey || item.itemKey !== nextItemKey) {
-      user.cart[i].itemKey = nextItemKey;
+      user.items[i].itemKey = nextItemKey;
       repaired = true;
     }
 
     if (!item.priceSnapshot || item.priceSnapshot.amount === undefined || item.priceSnapshot.currency === undefined) {
-      user.cart[i].priceSnapshot = {
+      user.items[i].priceSnapshot = {
         amount: liveSelection.price.amount,
         currency: liveSelection.price.currency,
       };
-      user.cart[i].attributesSnapshot = liveSelection.attributes;
-      user.cart[i].titleSnapshot = liveSelection.title;
-      user.cart[i].imageSnapshot = liveSelection.image;
-      user.cart[i].stockSnapshot = liveSelection.stock;
+      user.items[i].attributesSnapshot = liveSelection.attributes;
+      user.items[i].titleSnapshot = liveSelection.title;
+      user.items[i].imageSnapshot = liveSelection.image;
+      user.items[i].stockSnapshot = liveSelection.stock;
       repaired = true;
     }
   }
@@ -97,25 +98,56 @@ async function repairCartSnapshots(user) {
   return repaired;
 }
 
+function serializeLegacyCartItems(legacyItems = []) {
+  return legacyItems
+    .filter((item) => item?.product)
+    .map((item) => ({
+      product: item.product,
+      variantId: item.variantId || null,
+      itemKey: item.itemKey || buildItemKey(item.product.toString(), item.variantId?.toString()),
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      priceSnapshot: {
+        amount: Number(item.priceSnapshot?.amount) || 0,
+        currency: item.priceSnapshot?.currency || "INR",
+      },
+      attributesSnapshot: toObjectEntries(item.attributesSnapshot),
+      stockSnapshot: Number(item.stockSnapshot) || 0,
+      titleSnapshot: item.titleSnapshot || "",
+      imageSnapshot: item.imageSnapshot || "",
+      snapshotCreatedAt: item.snapshotCreatedAt || new Date(),
+    }));
+}
+
+async function getOrCreateCartDocument(userId) {
+  let cart = await CartModel.findOne({ user: userId });
+  if (cart) return cart;
+
+  const user = await UserModel.findById(userId).select("cart").lean();
+  const migratedItems = serializeLegacyCartItems(user?.cart || []);
+
+  cart = await CartModel.create({ user: userId, items: migratedItems });
+  return cart;
+}
+
 export async function getCart(req, res) {
   try {
-    const user = await UserModel.findById(req.user.userId);
+    const cartDoc = await getOrCreateCartDocument(req.user.userId);
 
-    const repaired = await repairCartSnapshots(user);
+    const repaired = await repairCartSnapshots(cartDoc);
     if (repaired) {
-      await user.save({ validateModifiedOnly: true });
+      await cartDoc.save({ validateModifiedOnly: true });
     }
 
-    const productIds = user.cart.map((item) => item.product);
+    const productIds = cartDoc.items.map((item) => item.product);
     const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
     const productMap = {};
     liveProducts.forEach((product) => {
       productMap[product._id.toString()] = product;
     });
 
-    const processedCart = user.cart.map((item) => {
+    const processedCart = cartDoc.items.map((item) => {
       const liveProduct = productMap[item.product.toString()];
-      const cartObj = item.toObject();
+      const cartObj = typeof item.toObject === "function" ? item.toObject() : { ...item };
 
       if (!liveProduct) {
         cartObj.isUnavailable = true;
@@ -173,11 +205,11 @@ export async function addToCart(req, res) {
       return res.status(400).json({ success: false, message: "Quantity offset cannot be zero" });
     }
 
-    const user = await UserModel.findById(req.user.userId);
+    const cartDoc = await getOrCreateCartDocument(req.user.userId);
 
-    const repaired = await repairCartSnapshots(user);
+    const repaired = await repairCartSnapshots(cartDoc);
     if (repaired) {
-      await user.save({ validateModifiedOnly: true });
+      await cartDoc.save({ validateModifiedOnly: true });
     }
 
     const liveProduct = await Product.findById(productId).lean();
@@ -202,10 +234,10 @@ export async function addToCart(req, res) {
     }
 
     const itemKey = buildItemKey(productId, liveSelection.variantId || null);
-    const existingItemIndex = user.cart.findIndex((item) => item.itemKey === itemKey);
+    const existingItemIndex = cartDoc.items.findIndex((item) => item.itemKey === itemKey);
 
     if (existingItemIndex > -1) {
-      const currentQty = user.cart[existingItemIndex].quantity;
+      const currentQty = cartDoc.items[existingItemIndex].quantity;
       const newQuantity = currentQty + safeQuantity;
 
       if (newQuantity <= 0) {
@@ -216,8 +248,8 @@ export async function addToCart(req, res) {
         return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
       }
 
-      user.cart[existingItemIndex].quantity = newQuantity;
-      user.cart[existingItemIndex].stockSnapshot = liveSelection.stock;
+      cartDoc.items[existingItemIndex].quantity = newQuantity;
+      cartDoc.items[existingItemIndex].stockSnapshot = liveSelection.stock;
     } else {
       if (safeQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
@@ -227,7 +259,7 @@ export async function addToCart(req, res) {
         return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
       }
 
-      user.cart.push({
+      cartDoc.items.push({
         product: productId,
         variantId: liveSelection.variantId || undefined,
         itemKey,
@@ -243,8 +275,8 @@ export async function addToCart(req, res) {
       });
     }
 
-    await user.save();
-    return res.status(200).json({ success: true, message: "Added to cart", cart: user.cart });
+    await cartDoc.save();
+    return res.status(200).json({ success: true, message: "Added to cart", cart: cartDoc.items });
   } catch (error) {
     console.error("Error adding to cart:", error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -254,16 +286,16 @@ export async function addToCart(req, res) {
 export async function removeFromCart(req, res) {
   try {
     const { itemKey, productId } = req.body;
-    const user = await UserModel.findById(req.user.userId);
+    const cartDoc = await getOrCreateCartDocument(req.user.userId);
 
     if (itemKey) {
-      user.cart = user.cart.filter((item) => item.itemKey !== itemKey);
+      cartDoc.items = cartDoc.items.filter((item) => item.itemKey !== itemKey);
     } else if (productId) {
-      user.cart = user.cart.filter((item) => item.product.toString() !== productId);
+      cartDoc.items = cartDoc.items.filter((item) => item.product.toString() !== productId);
     }
 
-    await user.save();
-    return res.status(200).json({ success: true, message: "Removed from cart", cart: user.cart });
+    await cartDoc.save();
+    return res.status(200).json({ success: true, message: "Removed from cart", cart: cartDoc.items });
   } catch (error) {
     console.error("Error removing from cart:", error);
     return res.status(500).json({ success: false, message: "Server error" });
