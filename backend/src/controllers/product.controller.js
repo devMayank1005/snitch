@@ -1,5 +1,6 @@
 import Product from "../models/product.model.js";
 import { uploadFile } from "../services/storage.service.js";
+import { findProductByIdWithAvailability, findProductsWithAvailability } from "../dao/product.dao.js";
 
 function parseJsonObject(input, fallback = {}) {
   if (!input) return fallback;
@@ -176,7 +177,7 @@ export async function getSellerProducts(req, res) {
   try {
     const sellerId = req.user.userId;
 
-    const products = await Product.find({ seller: sellerId }).lean().sort({ createdAt: -1 });
+    const products = await findProductsWithAvailability({ seller: sellerId }, { createdAt: -1 });
 
     const enriched = products.map((product) => ({
       ...product,
@@ -203,7 +204,7 @@ export async function getAllProducts(req, res) {
     if (category) query.category = category;
     if (search) query.title = { $regex: search, $options: "i" };
 
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    const products = await findProductsWithAvailability(query, { createdAt: -1 });
 
     return res.status(200).json({
       message: "Products fetched successfully",
@@ -220,7 +221,7 @@ export async function getProductDetails(req, res) {
   try {
     const { id } = req.params;
 
-    const product = await Product.findById(id).lean();
+    const product = await findProductByIdWithAvailability(id);
     if (!product) {
       return res.status(404).json({ message: "Product not found", success: false });
     }

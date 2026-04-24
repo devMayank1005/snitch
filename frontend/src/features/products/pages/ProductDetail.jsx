@@ -173,7 +173,7 @@ const getStockForAttributeValue = (variants = [], axisKey, value, selectedAttrib
     return variants.reduce((total, variant) => {
         if (variant?.isActive === false) return total;
 
-        const variantStock = Number(variant?.stock) || 0;
+        const variantStock = Number(variant?.availableStock ?? variant?.stock) || 0;
         if (variantStock <= 0) return total;
 
         const variantAttributes = toPlainAttributes(variant?.attributes || {});
@@ -220,9 +220,9 @@ const ProductDetail = () => {
 
     const normalizedVariants = normalizeProductVariants(product?.variants || [], product?.variationStructure || []);
     const hasVariants = normalizedVariants.length > 0;
-    const baseStock = Number(product?.stock) || 0;
+    const baseStock = Number(product?.availableStock ?? product?.stock) || 0;
     const hasBaseOption = baseStock > 0;
-    const activeStock = activeVariant ? Number(activeVariant.stock) || 0 : baseStock;
+    const activeStock = activeVariant ? Number(activeVariant.availableStock ?? activeVariant.stock) || 0 : baseStock;
     const requiresVariantSelection = hasVariants && !selectedVariantId && !hasBaseOption;
     const canAddToCart = activeStock > 0 && !requiresVariantSelection;
 

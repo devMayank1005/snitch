@@ -1,6 +1,7 @@
 import { UserModel } from "../models/user.model.js";
 import { CartModel } from "../models/cart.model.js";
 import Product from "../models/product.model.js";
+import { findProductByIdWithAvailability, applyAvailabilityToProducts } from "../dao/product.dao.js";
 
 function buildItemKey(productId, variantId) {
   return `${productId}:${variantId || "base"}`;
@@ -30,7 +31,7 @@ function resolveLiveSelection(product, variantId) {
     return {
       title: product.title,
       attributes: toObjectEntries(variant.attributes),
-      stock: Number(variant.stock) || 0,
+      stock: Number(variant.availableStock ?? variant.stock) || 0,
       image: effectiveImages?.[0]?.url || "",
       price: effectivePrice,
       variantId: variant._id?.toString(),
@@ -40,7 +41,7 @@ function resolveLiveSelection(product, variantId) {
   return {
     title: product.title,
     attributes: {},
-    stock: Number(product.stock) || 0,
+    stock: Number(product.availableStock ?? product.stock) || 0,
     image: product.images?.[0]?.url || "",
     price: product.price,
     variantId: null,
@@ -139,7 +140,8 @@ export async function getCart(req, res) {
     }
 
     const productIds = cartDoc.items.map((item) => item.product);
-    const liveProducts = await Product.find({ _id: { $in: productIds } }).lean();
+    const rawProducts = await Product.find({ _id: { $in: productIds } }).lean();
+    const liveProducts = await applyAvailabilityToProducts(rawProducts);
     const productMap = {};
     liveProducts.forEach((product) => {
       productMap[product._id.toString()] = product;
@@ -212,16 +214,16 @@ export async function addToCart(req, res) {
       await cartDoc.save({ validateModifiedOnly: true });
     }
 
-    const liveProduct = await Product.findById(productId).lean();
+    const liveProduct = await findProductByIdWithAvailability(productId);
     if (!liveProduct) {
       return res.status(404).json({ success: false, message: "Product no longer exists." });
     }
 
     const hasActiveVariants = Array.isArray(liveProduct.variants)
       && liveProduct.variants.some((entry) => entry?.isActive !== false);
-    const baseStock = Number(liveProduct.stock) || 0;
+    const baseStock = Number(liveProduct.availableStock ?? liveProduct.stock) || 0;
 
-    if (!variantId && hasActiveVariants && baseStock <= 0) {
+    if (safeQuantity > 0 && !variantId && hasActiveVariants && baseStock <= 0) {
       return res.status(400).json({
         success: false,
         message: "Please select an available variation before adding this item to cart.",
@@ -239,23 +241,26 @@ export async function addToCart(req, res) {
     if (existingItemIndex > -1) {
       const currentQty = cartDoc.items[existingItemIndex].quantity;
       const newQuantity = currentQty + safeQuantity;
+      const availableNow = Number(liveSelection.stock) || 0;
+      const maxAllowedQuantity = currentQty + availableNow;
 
       if (newQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
 
-      if (newQuantity > liveSelection.stock) {
+      if (newQuantity > maxAllowedQuantity) {
         return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
       }
 
       cartDoc.items[existingItemIndex].quantity = newQuantity;
-      cartDoc.items[existingItemIndex].stockSnapshot = liveSelection.stock;
+      cartDoc.items[existingItemIndex].stockSnapshot = Math.max(0, maxAllowedQuantity - newQuantity);
     } else {
       if (safeQuantity <= 0) {
         return res.status(400).json({ success: false, message: "Quantity must be at least 1" });
       }
 
-      if (safeQuantity > liveSelection.stock) {
+      const availableNow = Number(liveSelection.stock) || 0;
+      if (safeQuantity > availableNow) {
         return res.status(400).json({ success: false, message: "Requested quantity exceeds stock" });
       }
 
@@ -269,13 +274,14 @@ export async function addToCart(req, res) {
           currency: liveSelection.price.currency,
         },
         attributesSnapshot: liveSelection.attributes,
-        stockSnapshot: liveSelection.stock,
+        stockSnapshot: Math.max(0, availableNow - safeQuantity),
         titleSnapshot: liveSelection.title,
         imageSnapshot: liveSelection.image,
       });
     }
 
     await cartDoc.save();
+
     return res.status(200).json({ success: true, message: "Added to cart", cart: cartDoc.items });
   } catch (error) {
     console.error("Error adding to cart:", error);
@@ -295,6 +301,7 @@ export async function removeFromCart(req, res) {
     }
 
     await cartDoc.save();
+
     return res.status(200).json({ success: true, message: "Removed from cart", cart: cartDoc.items });
   } catch (error) {
     console.error("Error removing from cart:", error);
