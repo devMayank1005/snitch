@@ -140,7 +140,8 @@ const getAvailableAttributeValues = (variants = [], axisKey, selectedAttributes 
 
     variants.forEach((variant) => {
         // Skip variants with no stock
-        if (!variant.stock || variant.stock <= 0) return;
+        const variantStock = Number(variant?.availableStock ?? variant?.stock) || 0;
+        if (variantStock <= 0) return;
         
         const variantAttributes = toPlainAttributes(variant?.attributes || {});
         const normalizedVariantAttrs = Object.fromEntries(
@@ -217,6 +218,14 @@ const ProductDetail = () => {
     // Dynamic Display State
     const [displayPrice, setDisplayPrice] = useState(null);
     const [displayImages, setDisplayImages] = useState([]);
+    const [cartPopup, setCartPopup] = useState({
+        visible: false,
+        title: '',
+        image: '',
+        priceLabel: '',
+        attributes: {},
+        quantity: 1,
+    });
 
     const normalizedVariants = normalizeProductVariants(product?.variants || [], product?.variationStructure || []);
     const hasVariants = normalizedVariants.length > 0;
@@ -225,6 +234,15 @@ const ProductDetail = () => {
     const activeStock = activeVariant ? Number(activeVariant.availableStock ?? activeVariant.stock) || 0 : baseStock;
     const requiresVariantSelection = hasVariants && !selectedVariantId && !hasBaseOption;
     const canAddToCart = activeStock > 0 && !requiresVariantSelection;
+
+    useEffect(() => {
+        if (!cartPopup.visible) return;
+        const timer = setTimeout(() => {
+            setCartPopup((prev) => ({ ...prev, visible: false }));
+        }, 4500);
+
+        return () => clearTimeout(timer);
+    }, [cartPopup.visible]);
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -319,7 +337,7 @@ const ProductDetail = () => {
         setDisplayImages(product.images || []);
     };
 
-    const addToCart = async ({ redirectToCart = true } = {}) => {
+    const addToCart = async ({ redirectToCart = false, showSuccessPopup = true } = {}) => {
         if (!auth?.isAuthenticated) {
             navigate('/login');
             return false;
@@ -341,6 +359,18 @@ const ProductDetail = () => {
                 variantId: selectedVariantId || null,
                 quantity: 1,
             });
+
+            if (showSuccessPopup) {
+                setCartPopup({
+                    visible: true,
+                    title: product.title,
+                    image: displayImages?.[activeImage]?.url || product.images?.[0]?.url || '/snitch_editorial_warm.png',
+                    priceLabel: displayPrice?.amount ? `${displayPrice.currency} ${displayPrice.amount.toLocaleString()}` : 'Price not available',
+                    attributes: activeVariant?.attributes || {},
+                    quantity: 1,
+                });
+            }
+
             if (redirectToCart) {
                 navigate('/cart');
             }
@@ -358,7 +388,7 @@ const ProductDetail = () => {
             navigate('/login');
             return;
         }
-        const success = await addToCart({ redirectToCart: false });
+        const success = await addToCart({ redirectToCart: false, showSuccessPopup: false });
         if (success) {
             alert("Redirecting to checkout...");
             // navigate('/checkout');
@@ -410,6 +440,53 @@ const ProductDetail = () => {
                 rel="stylesheet"
             />
             <div className="min-h-screen selection:bg-[#C9A96E]/30 pb-24" style={{ backgroundColor: '#fbf9f6', fontFamily: "'Inter', sans-serif" }}>
+
+                {cartPopup.visible && (
+                    <div className="fixed z-50 top-6 right-6 w-[92vw] max-w-sm bg-[#1b1c1a] text-[#fbf9f6] shadow-2xl border border-[#3b3a37]">
+                        <div className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#C9A96E]">Added to cart successfully</p>
+                                    <h3 className="mt-2 text-sm uppercase tracking-wide">{cartPopup.title}</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setCartPopup((prev) => ({ ...prev, visible: false }))}
+                                    className="text-[#b5b5b5] hover:text-[#fbf9f6] text-xs uppercase tracking-[0.15em]"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-3 flex gap-3">
+                                <img
+                                    src={cartPopup.image}
+                                    alt={cartPopup.title}
+                                    className="w-16 h-20 object-cover bg-[#2f2e2b]"
+                                />
+                                <div className="min-w-0">
+                                    <p className="text-xs text-[#d8d0c4]">{cartPopup.priceLabel}</p>
+                                    <p className="text-xs text-[#d8d0c4] mt-1">Qty: {cartPopup.quantity}</p>
+                                    {Object.keys(cartPopup.attributes || {}).length > 0 && (
+                                        <p className="text-[11px] mt-2 text-[#C9A96E] truncate">
+                                            {Object.entries(cartPopup.attributes)
+                                                .map(([key, value]) => `${labelAttributeKey(key)}: ${value}`)
+                                                .join(' | ')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => navigate('/cart')}
+                                className="mt-4 w-full py-2 text-[11px] uppercase tracking-[0.2em] bg-[#C9A96E] text-[#1b1c1a] hover:bg-[#d8bb88] transition-colors"
+                            >
+                                View Your Cart
+                            </button>
+                        </div>
+                    </div>
+                )}
                 
                 {/* ── Top Bar ── */}
                 <div className="max-w-7xl mx-auto px-8 lg:px-16 xl:px-24 pt-10 pb-12 flex items-center gap-5">
