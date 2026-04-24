@@ -1,9 +1,7 @@
 import React from 'react';
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
 import { useCart } from '../hook/useCart';
-import { Link } from 'react-router'; // Wait, standard is react-router-dom in v6 usually, we rely on existing
-import ConfirmModal from '../../Shared/Components/ConfirmModal.jsx';
+import { useConfirmModal } from '../../../app/confirm-modal.context.jsx';
 
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -14,8 +12,8 @@ const TrashIcon = () => (
 
 const CartItemRow = React.memo(({ item }) => {
     const { handleUpdateQuantity, handleRemoveFromCart } = useCart();
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const { confirm } = useConfirmModal();
     
     // Strict isolation to Snapshots
     const title = item.titleSnapshot || 'archived product';
@@ -53,32 +51,25 @@ const CartItemRow = React.memo(({ item }) => {
         }
     };
 
-    const onRemove = () => {
-        setDeleteModalOpen(true);
-    };
+    const onRemove = async () => {
+        const confirmed = await confirm({
+            title: 'Delete Cart Item',
+            message: `Are you sure you want to remove ${title} from your cart?`,
+            confirmLabel: 'Delete',
+            confirmTone: 'danger',
+        });
 
-    const handleConfirmRemove = async () => {
+        if (!confirmed) return;
+
         try {
             setIsDeleting(true);
             await handleRemoveFromCart({ itemKey: item.itemKey, productId: item.product });
-            setDeleteModalOpen(false);
         } finally {
             setIsDeleting(false);
         }
     };
 
     return (
-        <>
-        <ConfirmModal
-            isOpen={deleteModalOpen}
-            title="Delete Cart Item"
-            message={`Are you sure you want to remove ${title} from your cart?`}
-            confirmLabel="Delete"
-            confirmTone="danger"
-            isConfirming={isDeleting}
-            onConfirm={handleConfirmRemove}
-            onCancel={() => setDeleteModalOpen(false)}
-        />
         <div className={`py-6 flex flex-col sm:flex-row gap-6 border-b border-[#E8E1DA] transition-opacity duration-300 ${isUnavailable ? 'opacity-40 grayscale pointer-events-none relative' : ''}`}>
            {/* IMAGE */}
            <div className="w-24 h-32 flex-shrink-0 bg-[#f5f3f0] overflow-hidden">
@@ -139,7 +130,6 @@ const CartItemRow = React.memo(({ item }) => {
                </div>
            </div>
         </div>
-        </>
     );
 });
 

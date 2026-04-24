@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useProduct } from '../hooks/useProduct';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router';
-import ConfirmModal from '../../Shared/Components/ConfirmModal.jsx';
+import { useConfirmModal } from '../../../app/confirm-modal.context.jsx';
 
 const Dashboard = () => {
     const { handleGetSellerProduct, handleDeleteProduct } = useProduct();
     const sellerProducts = useSelector(state => state.product.sellerProducts);
     const navigate = useNavigate();
     const [deletingProductId, setDeletingProductId] = useState(null);
-    const [deleteModal, setDeleteModal] = useState({ isOpen: false, productId: null, title: '' });
+    const { confirm } = useConfirmModal();
 
     useEffect(() => {
         handleGetSellerProduct();
@@ -19,21 +19,19 @@ const Dashboard = () => {
         e.stopPropagation();
 
         const targetProduct = sellerProducts?.find((product) => product._id === productId);
-        setDeleteModal({
-            isOpen: true,
-            productId,
-            title: targetProduct?.title || 'this product',
+        const confirmed = await confirm({
+            title: 'Delete Product',
+            message: `Are you sure you want to delete ${targetProduct?.title || 'this product'}? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            confirmTone: 'danger',
         });
-    };
 
-    const handleConfirmDelete = async () => {
-        if (!deleteModal.productId) return;
+        if (!confirmed) return;
 
         try {
-            setDeletingProductId(deleteModal.productId);
-            await handleDeleteProduct(deleteModal.productId);
+            setDeletingProductId(productId);
+            await handleDeleteProduct(productId);
             await handleGetSellerProduct();
-            setDeleteModal({ isOpen: false, productId: null, title: '' });
         } catch (error) {
             const message = error?.response?.data?.message || error?.message || 'Failed to delete product.';
             alert(message);
@@ -55,17 +53,6 @@ const Dashboard = () => {
                 className="min-h-screen selection:bg-[#C9A96E]/30"
                 style={{ backgroundColor: '#fbf9f6', fontFamily: "'Inter', sans-serif" }}
             >
-                <ConfirmModal
-                    isOpen={deleteModal.isOpen}
-                    title="Delete Product"
-                    message={`Are you sure you want to delete ${deleteModal.title}? This action cannot be undone.`}
-                    confirmLabel="Delete"
-                    confirmTone="danger"
-                    isConfirming={deletingProductId === deleteModal.productId}
-                    onConfirm={handleConfirmDelete}
-                    onCancel={() => setDeleteModal({ isOpen: false, productId: null, title: '' })}
-                />
-
                 <div className="max-w-7xl mx-auto px-8 lg:px-16 xl:px-24">
 
                     {/* ── Top Bar ── */}
