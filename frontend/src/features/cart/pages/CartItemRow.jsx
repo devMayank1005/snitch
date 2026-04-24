@@ -1,10 +1,21 @@
 import React from 'react';
+import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useCart } from '../hook/useCart';
 import { Link } from 'react-router'; // Wait, standard is react-router-dom in v6 usually, we rely on existing
+import ConfirmModal from '../../Shared/Components/ConfirmModal.jsx';
+
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+);
 
 const CartItemRow = React.memo(({ item }) => {
     const { handleUpdateQuantity, handleRemoveFromCart } = useCart();
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     
     // Strict isolation to Snapshots
     const title = item.titleSnapshot || 'archived product';
@@ -43,10 +54,31 @@ const CartItemRow = React.memo(({ item }) => {
     };
 
     const onRemove = () => {
-        handleRemoveFromCart({ itemKey: item.itemKey, productId: item.product });
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmRemove = async () => {
+        try {
+            setIsDeleting(true);
+            await handleRemoveFromCart({ itemKey: item.itemKey, productId: item.product });
+            setDeleteModalOpen(false);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
+        <>
+        <ConfirmModal
+            isOpen={deleteModalOpen}
+            title="Delete Cart Item"
+            message={`Are you sure you want to remove ${title} from your cart?`}
+            confirmLabel="Delete"
+            confirmTone="danger"
+            isConfirming={isDeleting}
+            onConfirm={handleConfirmRemove}
+            onCancel={() => setDeleteModalOpen(false)}
+        />
         <div className={`py-6 flex flex-col sm:flex-row gap-6 border-b border-[#E8E1DA] transition-opacity duration-300 ${isUnavailable ? 'opacity-40 grayscale pointer-events-none relative' : ''}`}>
            {/* IMAGE */}
            <div className="w-24 h-32 flex-shrink-0 bg-[#f5f3f0] overflow-hidden">
@@ -101,12 +133,13 @@ const CartItemRow = React.memo(({ item }) => {
                        </button>
                    </div>
                    
-                   <button onClick={onRemove} className="text-[10px] uppercase tracking-widest underline decoration-[#B5ADA3] hover:text-[#C9A96E] transition-colors" style={{ color: '#7A6E63' }}>
-                       Remove
+                   <button onClick={onRemove} className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest hover:text-[#C9A96E] transition-colors" style={{ color: '#7A6E63' }}>
+                       <TrashIcon /> Delete item
                    </button>
                </div>
            </div>
         </div>
+        </>
     );
 });
 

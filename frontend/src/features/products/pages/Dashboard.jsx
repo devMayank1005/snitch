@@ -1,16 +1,47 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useProduct } from '../hooks/useProduct';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router';
+import ConfirmModal from '../../Shared/Components/ConfirmModal.jsx';
 
 const Dashboard = () => {
-    const { handleGetSellerProduct } = useProduct();
+    const { handleGetSellerProduct, handleDeleteProduct } = useProduct();
     const sellerProducts = useSelector(state => state.product.sellerProducts);
     const navigate = useNavigate();
+    const [deletingProductId, setDeletingProductId] = useState(null);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, productId: null, title: '' });
 
     useEffect(() => {
         handleGetSellerProduct();
     }, []);
+
+    const handleDeleteProductClick = async (e, productId) => {
+        e.stopPropagation();
+
+        const targetProduct = sellerProducts?.find((product) => product._id === productId);
+        setDeleteModal({
+            isOpen: true,
+            productId,
+            title: targetProduct?.title || 'this product',
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!deleteModal.productId) return;
+
+        try {
+            setDeletingProductId(deleteModal.productId);
+            await handleDeleteProduct(deleteModal.productId);
+            await handleGetSellerProduct();
+            setDeleteModal({ isOpen: false, productId: null, title: '' });
+        } catch (error) {
+            const message = error?.response?.data?.message || error?.message || 'Failed to delete product.';
+            alert(message);
+            console.error('Failed to delete product:', error);
+        } finally {
+            setDeletingProductId(null);
+        }
+    };
 
     return (
         <>
@@ -24,6 +55,17 @@ const Dashboard = () => {
                 className="min-h-screen selection:bg-[#C9A96E]/30"
                 style={{ backgroundColor: '#fbf9f6', fontFamily: "'Inter', sans-serif" }}
             >
+                <ConfirmModal
+                    isOpen={deleteModal.isOpen}
+                    title="Delete Product"
+                    message={`Are you sure you want to delete ${deleteModal.title}? This action cannot be undone.`}
+                    confirmLabel="Delete"
+                    confirmTone="danger"
+                    isConfirming={deletingProductId === deleteModal.productId}
+                    onConfirm={handleConfirmDelete}
+                    onCancel={() => setDeleteModal({ isOpen: false, productId: null, title: '' })}
+                />
+
                 <div className="max-w-7xl mx-auto px-8 lg:px-16 xl:px-24">
 
                     {/* ── Top Bar ── */}
@@ -91,7 +133,7 @@ const Dashboard = () => {
                                 return (
                                     <div
                                         onClick={() => { navigate(`/seller/product/${product._id}`) }}
-                                        key={product._id} className="group cursor-pointer flex flex-col">
+                                        key={product._id} className="group cursor-pointer flex flex-col relative">
                                         {/* Image Container */}
                                         <div className="aspect-[4/5] overflow-hidden mb-6" style={{ backgroundColor: '#f5f3f0' }}>
                                             <img
@@ -110,6 +152,14 @@ const Dashboard = () => {
                                                 >
                                                     {product.title}
                                                 </h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteProductClick(e, product._id)}
+                                                    disabled={deletingProductId === product._id}
+                                                    className="shrink-0 rounded-full border border-[#e3d8c8] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#ba1a1a] hover:bg-[#ffebeb] transition-colors disabled:opacity-50"
+                                                >
+                                                    {deletingProductId === product._id ? 'Deleting' : 'Delete'}
+                                                </button>
                                             </div>
 
                                             <p
