@@ -2,8 +2,12 @@ import axios from "axios";
 import { store } from "../../../app/app.store.js";
 import { setToken, setRefreshToken, logout } from "../state/auth.slice.js";
 
+const apiBase = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/auth`
+  : "/api/auth";
+
 const authApiInstance = axios.create({
-  baseURL: "/api/auth",
+  baseURL: apiBase,
   withCredentials: true,
 });
 
@@ -52,8 +56,8 @@ authApiInstance.interceptors.response.use(
         const state = store.getState();
         const refreshToken = state.auth.refreshToken;
 
-        const response = await axios.post(
-          "/api/auth/refresh",
+        const response = await authApiInstance.post(
+          "/refresh",
           refreshToken ? { refreshToken } : {},
           { withCredentials: true }
         );
